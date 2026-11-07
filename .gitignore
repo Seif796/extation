@@ -5,3 +5,5 @@ android/app/build/
 out.txt
 err.txt
 node_modules/
+*.vsix
+.vscode/
