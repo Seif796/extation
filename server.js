@@ -30,7 +30,7 @@ class LanServer {
     // 1. Try to find Wi-Fi or wireless adapter first
     for (const name in interfaces) {
       const lower = name.toLowerCase();
-      if (lower.includes('wi-fi') || lower.includes('wireless') || lower.includes('wlan')) {
+      if (lower.includes('wi-fi') || lower.includes('wifi') || lower.includes('wireless') || lower.includes('wlan')) {
         for (const iface of interfaces[name]) {
           if (iface.family === 'IPv4' && !iface.internal) {
             return iface.address;
@@ -170,44 +170,18 @@ class LanServer {
       return res.end(getMobileHtml(this.localIp, this.port, this.pin));
     }
 
-    // 2. Authentication with PIN & Laptop Approval
+    // 2. Authentication with PIN & Instant Secure Connection
     if (pathname === '/api/auth' && req.method === 'POST') {
       const body = await this.parseBody(req);
       if (body.pin && body.pin.toString() === this.pin.toString()) {
         const clientIp = (req.socket.remoteAddress || 'Mobile Phone').replace('::ffff:', '');
         
-        // Show interactive approval dialog on the laptop in VS Code
-        const decisionPromise = new Promise((resolve) => {
-          vscode.window.showInformationMessage(
-            `📱 Da7e AI: Phone Connection Request from [${clientIp}]! Allow this phone to control VS Code?`,
-            { modal: true },
-            '✅ Accept (موافق)',
-            '❌ Reject (رفض)'
-          ).then(selection => {
-            if (selection === '✅ Accept (موافق)') {
-              resolve(true);
-            } else {
-              resolve(false);
-            }
-          });
-
-          // Timeout after 45 seconds
-          setTimeout(() => resolve(false), 45000);
-        });
-
-        const isAllowed = await decisionPromise;
-
-        if (isAllowed) {
-          this.connectedPhonesCount++;
-          vscode.window.showInformationMessage(`🎉 Device [${clientIp}] is now connected and has full control of VS Code!`);
-          if (this.onStatusChanged) this.onStatusChanged();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: true, token: this.authToken }));
-        } else {
-          vscode.window.showWarningMessage(`🚫 Connection request from [${clientIp}] was rejected.`);
-          res.writeHead(403, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: false, error: 'Connection rejected by laptop user.' }));
-        }
+        this.connectedPhonesCount++;
+        vscode.window.showInformationMessage(`🎉 Da7e AI: Phone [${clientIp}] connected! Dual-screen AI chat & remote control active.`);
+        
+        if (this.onStatusChanged) this.onStatusChanged();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true, token: this.authToken }));
       } else {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ success: false, error: 'Invalid PIN. Check your laptop screen.' }));
