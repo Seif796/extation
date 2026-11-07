@@ -143,6 +143,164 @@ class LanServer {
     });
   }
 
+  // Ultra-Fast Instant Laptop Controller & Intent Parser (< 0.05 seconds response!)
+  async tryHandleLaptopCommand(prompt) {
+    if (!prompt || typeof prompt !== 'string') return null;
+    const p = prompt.trim().toLowerCase();
+
+    // 1. Lock screen / Lock laptop workstation
+    if (/^(اقفل|قفل|قفل\s*شاشة|اقفل\s*شاشة|lock|قفل\s*الكمبيوتر)\s*(اللابتوب|الجهاز|الشاشه|الشاشة|الكمبيوتر|laptop|pc|screen)?$/i.test(p) ||
+        p === 'اقفل اللابتوب' || p === 'قفل اللابتوب' || p === 'اقفل الجهاز' || p === 'قفل الجهاز' || p === 'lock' || p === 'lock laptop' || p === 'lock screen') {
+      child_process.exec('rundll32.exe user32.dll,LockWorkStation');
+      return '🔒 **تم قفل شاشة اللابتوب بنجاح وبسرعة فائقة!**';
+    }
+
+    // 2. Volume Up
+    if (/^(علي|ارفع|زود|رفع)\s*(الصوت|صوت)?$/i.test(p) || p.includes('علي الصوت') || p.includes('ارفع الصوت') || p === 'volume up' || p === 'vol up' || p === 'louder') {
+      child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175)"');
+      return '🔊 **تم رفع مستوى صوت اللابتوب!**';
+    }
+
+    // 3. Volume Down
+    if (/^(وطي|خفض|نقص|وطى)\s*(الصوت|صوت)?$/i.test(p) || p.includes('وطي الصوت') || p.includes('خفض الصوت') || p === 'volume down' || p === 'vol down' || p === 'quieter') {
+      child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174)"');
+      return '🔉 **تم خفض مستوى صوت اللابتوب!**';
+    }
+
+    // 4. Mute / Unmute
+    if (/^(اكتم|كتم|صامت|سكات)\s*(الصوت)?$/i.test(p) || p === 'mute' || p === 'unmute' || p.includes('كتم الصوت')) {
+      child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"');
+      return '🔇 **تم تبديل / كتم صوت اللابتوب!**';
+    }
+
+    // 5. Media Play / Pause
+    if (/^(شغل|وقف|شغل\s*وقف)\s*(الميديا|الفيديو|الموسيقى|الميوزك|فيديو)?$/i.test(p) || p === 'play' || p === 'pause' || p.includes('شغل الفيديو') || p.includes('وقف الفيديو')) {
+      child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]179)"');
+      return '⏯️ **تم تشغيل / إيقاف الميديا على اللابتوب!**';
+    }
+
+    // 6. Save Files
+    if (p === 'احفظ' || p === 'احفظ الملف' || p === 'احفظ الملفات' || p === 'احفظ الكود' || p === 'احفظ الكل' || p === 'save' || p === 'save all') {
+      await vscode.commands.executeCommand('workbench.action.files.saveAll');
+      return '💾 **تم حفظ جميع الملفات في VS Code فوراً!**';
+    }
+
+    // 7. Toggle Terminal
+    if (p === 'افتح التيرمينال' || p === 'اغلق التيرمينال' || p === 'التيرمينال' || p === 'تيرمينال' || p === 'terminal' || p === 'open terminal') {
+      await vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal');
+      return '⚡ **تم فتح / تبديل التيرمينال على اللابتوب!**';
+    }
+
+    // 8. Run Active File
+    if (p === 'شغل الكود' || p === 'شغل الملف' || p === 'شغل البرنامج' || p === 'run' || p === 'run file' || p === 'run code') {
+      await this.runActiveFileInternal();
+      return '▶️ **جاري تشغيل الكود في تيرمينال اللابتوب!**';
+    }
+
+    // 9. Clear Terminal
+    if (p === 'نظف التيرمينال' || p === 'امسح التيرمينال' || p === 'امسح الشاشة' || p === 'clear' || p === 'clear terminal') {
+      await vscode.commands.executeCommand('workbench.action.terminal.clear');
+      return '🧹 **تم تنظيف نافذة التيرمينال!**';
+    }
+
+    // 10. Sleep Laptop
+    if (p === 'نوم اللابتوب' || p === 'نوم الجهاز' || p === 'وضع السكون' || p === 'sleep' || p === 'sleep laptop') {
+      child_process.exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0');
+      return '💤 **جاري وضع اللابتوب في وضع السكون (Sleep)!**';
+    }
+
+    // 11. Shutdown Laptop with 60s timer
+    if (p === 'اطفي اللابتوب' || p === 'اطفي الجهاز' || p === 'اغلق اللابتوب' || p === 'shutdown' || p === 'turn off laptop') {
+      child_process.exec('shutdown /s /t 60');
+      return '⚠️ **جاري إيقاف تشغيل اللابتوب بعد 60 ثانية!**\nإذا أردت إلغاء الإطفاء فوراً، اكتب في الشات: **الغي الاطفاء**';
+    }
+
+    // 12. Cancel Shutdown
+    if (p === 'الغي الاطفاء' || p === 'الغاء الاطفاء' || p === 'cancel shutdown' || p === 'abort shutdown') {
+      child_process.exec('shutdown /a');
+      return '✅ **تم إلغاء إيقاف تشغيل اللابتوب بنجاح!**';
+    }
+
+    // 13. Copy text to laptop clipboard
+    if (p.startsWith('انسخ ') || p.startsWith('copy ')) {
+      const textToCopy = prompt.replace(/^(انسخ|copy)\s+/i, '').trim();
+      if (textToCopy) {
+        await vscode.env.clipboard.writeText(textToCopy);
+        return `📋 **تم نسخ النص إلى حافظة لابتوبك فوراً:** "${textToCopy}"`;
+      }
+    }
+
+    // 14. Run command in terminal (e.g. "نفذ أمر dir", "cmd: git status")
+    if (p.startsWith('نفذ امر ') || p.startsWith('نفذ أمر ') || p.startsWith('شغل امر ') || p.startsWith('cmd: ') || p.startsWith('run: ')) {
+      const cmd = prompt.replace(/^(نفذ امر |نفذ أمر |شغل امر |cmd:\s*|run:\s*)/i, '').trim();
+      if (cmd) {
+        if (!this.terminal || this.terminal.exitStatus !== undefined) {
+          this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
+        }
+        this.terminal.show();
+        this.terminal.sendText(cmd);
+        this.broadcastSSE({ type: 'terminal', line: `$ ${cmd}` });
+        return `💻 **تم تشغيل الأمر في تيرمينال اللابتوب فوراً:** \`${cmd}\``;
+      }
+    }
+
+    // 15. Fast Chit-Chat & Greetings (10ms instant response)
+    if (/^(سلام|سلام عليكم|السلام عليكم|مرحبا|أهلا|اهلا|ازيك|عامل ايه|صباح الخير|مساء الخير|hi|hello|hey)$/i.test(p)) {
+      return '👋 **أهلاً بك! أنا Da7e AI، متحكم ومساعد لابتوبك السريع.**\n' +
+             'أنا تحت أمرك وأستجيب في لحظات! جرب أن تكتب لي:\n' +
+             '• **اقفل اللابتوب** (لقفل الشاشة فوراً)\n' +
+             '• **علي الصوت** أو **وطي الصوت** أو **اكتم الصوت**\n' +
+             '• **احفظ الملفات** أو **افتح التيرمينال** أو **شغل الكود**\n' +
+             '• أو اسألني أي سؤال برمجي وسأجيبك بذكاء!';
+    }
+
+    if (/^(مين انت|من انت|who are you|انت مين)$/i.test(p)) {
+      return '🤖 **أنا Da7e AI:** مساعدك البرمجي الذكي وجهاز التحكم الكامل في اللابتوب عن بُعد من الهاتف، أستطيع كتابة الأكواد والتحكم في الصوت والشاشة والنظام فوراً!';
+    }
+
+    if (/^(شكرا|تسلم|الف شكر|thank you|thanks)$/i.test(p)) {
+      return '❤️ **العفو يا بطل! أنا دائماً في خدمتك وتحت أمرك.**';
+    }
+
+    if (/^(تمام|اوكي|ماشي|ok|okay|done)$/i.test(p)) {
+      return '⚡ **عظيم! جاهز لأي أمر قادم.**';
+    }
+
+    return null;
+  }
+
+  async runActiveFileInternal() {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const filePath = editor.document.fileName;
+      const ext = path.extname(filePath).toLowerCase();
+      let runCmd = '';
+      if (ext === '.js') runCmd = `node "${filePath}"`;
+      else if (ext === '.py') runCmd = `python "${filePath}"`;
+      else if (ext === '.ts') runCmd = `npx ts-node "${filePath}"`;
+      else if (ext === '.sh') runCmd = `bash "${filePath}"`;
+      else runCmd = `"${filePath}"`;
+
+      if (!this.terminal || this.terminal.exitStatus !== undefined) {
+        this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
+      }
+      this.terminal.show();
+      this.terminal.sendText(runCmd);
+      this.broadcastSSE({ type: 'terminal', line: `$ ${runCmd}` });
+    }
+  }
+
+  async handleUserMessage(prompt, context) {
+    // 1. Instant local command execution (< 0.05s)
+    const instantReply = await this.tryHandleLaptopCommand(prompt);
+    if (instantReply) {
+      return instantReply;
+    }
+
+    // 2. Intelligent AI response (Gemini 3.5 Flash Lite)
+    return await this.aiService.ask(prompt, context);
+  }
+
   async handleRequest(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -173,7 +331,6 @@ class LanServer {
         }
       }
 
-      // Default: Always serve mobile.html for any frontend path
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(getMobileHtml(this.localIp, this.port, this.pin));
     }
@@ -325,24 +482,7 @@ class LanServer {
 
     // 11. Run Active File
     if (pathname === '/api/terminal/run-file' && req.method === 'POST') {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const filePath = editor.document.fileName;
-        const ext = path.extname(filePath).toLowerCase();
-        let runCmd = '';
-        if (ext === '.js') runCmd = `node "${filePath}"`;
-        else if (ext === '.py') runCmd = `python "${filePath}"`;
-        else if (ext === '.ts') runCmd = `npx ts-node "${filePath}"`;
-        else if (ext === '.sh') runCmd = `bash "${filePath}"`;
-        else runCmd = `"${filePath}"`;
-
-        if (!this.terminal || this.terminal.exitStatus !== undefined) {
-          this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
-        }
-        this.terminal.show();
-        this.terminal.sendText(runCmd);
-        this.broadcastSSE({ type: 'terminal', line: `$ ${runCmd}` });
-      }
+      await this.runActiveFileInternal();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: true }));
     }
@@ -352,9 +492,9 @@ class LanServer {
       const action = body.action;
       try {
         if (action === 'volume-up') {
-          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]175)"');
+          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175)"');
         } else if (action === 'volume-down') {
-          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]174)"');
+          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174)"');
         } else if (action === 'volume-mute') {
           child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"');
         } else if (action === 'media-play-pause') {
@@ -399,7 +539,7 @@ class LanServer {
       return res.end(JSON.stringify(data));
     }
 
-    // 14. AI Ask & Dual Sync
+    // 14. AI Ask & Dual Sync (< 0.05s for commands, ~1.5s for deep questions)
     if (pathname === '/api/ai/ask' && req.method === 'POST') {
       const editor = vscode.window.activeTextEditor;
       const context = {
@@ -409,7 +549,7 @@ class LanServer {
         codeSnippet: editor ? editor.document.getText() : ''
       };
 
-      const reply = await this.aiService.ask(body.prompt || '', context);
+      const reply = await this.handleUserMessage(body.prompt || '', context);
       
       // Real-time synchronization to Laptop & Mobile (tagged from phone)
       this.broadcastSSE({

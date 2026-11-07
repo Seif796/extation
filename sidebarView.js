@@ -74,7 +74,7 @@ class Da7eSidebarProvider {
             language: editor ? editor.document.languageId : null,
             selectedCode: editor ? editor.document.getText(editor.selection) : ''
           };
-          const reply = await this._aiService.ask(data.prompt, context);
+          const reply = await this._lanServer.handleUserMessage(data.prompt, context);
           this._view.webview.postMessage({ type: 'aiReply', reply, prompt: data.prompt });
           // Synchronize to mobile phone via SSE
           this._lanServer.broadcastSSE({
