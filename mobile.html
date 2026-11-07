@@ -12,13 +12,14 @@
   <style>
     :root {
       --bg: #0b0f19;
-      --card-bg: rgba(22, 30, 49, 0.88);
+      --card-bg: rgba(22, 30, 49, 0.92);
       --card-border: rgba(56, 189, 248, 0.22);
       --primary: #38bdf8;
       --primary-hover: #0284c7;
       --accent: #818cf8;
       --success: #10b981;
       --danger: #ef4444;
+      --warning: #f59e0b;
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --code-bg: #030712;
@@ -124,79 +125,39 @@
       color: var(--primary);
       margin-top: 10px;
     }
-    /* QR Scanner Modal */
-    #scannerModal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: #000;
-      z-index: 10000;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-    #scannerVideo {
-      width: 100%;
-      max-width: 480px;
-      height: 60vh;
-      object-fit: cover;
-      border-radius: 20px;
-    }
-    .scanner-box {
-      position: relative;
-      width: 250px;
-      height: 250px;
-      border: 3px solid #38bdf8;
-      border-radius: 20px;
-      margin: -200px auto 30px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
-      pointer-events: none;
-    }
-    .scanner-close {
-      position: absolute;
-      top: 24px;
-      right: 24px;
-      background: #ef4444;
-      color: #fff;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 20px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    /* Install Banner */
+    /* PWA Banner */
     #installBanner {
       display: none;
-      background: linear-gradient(135deg, rgba(2,132,199,0.2), rgba(99,102,241,0.2));
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 10px 14px;
-      margin: 12px 16px 0;
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      padding: 10px 16px;
       justify-content: space-between;
       align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
     }
     .btn-install {
-      background: var(--primary);
-      color: #000;
-      font-weight: 700;
-      padding: 6px 14px;
-      border-radius: 8px;
+      background: #fff;
+      color: #0284c7;
       border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-weight: 700;
       font-size: 0.8rem;
       cursor: pointer;
     }
     /* Header */
     header {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--card-border);
-      padding: 14px 18px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      padding: 14px 18px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      backdrop-filter: blur(10px);
     }
     .header-logo {
       display: flex;
@@ -206,18 +167,20 @@
     .header-logo h1 {
       font-size: 1.15rem;
       font-weight: 800;
-      color: var(--primary);
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     .status-badge {
-      font-size: 0.75rem;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--success);
-      border: 1px solid rgba(16, 185, 129, 0.3);
       display: flex;
       align-items: center;
       gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--success);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      color: var(--success);
       font-weight: 600;
     }
     .status-dot {
@@ -227,66 +190,72 @@
       background: var(--success);
       box-shadow: 0 0 8px var(--success);
     }
-    /* Active File Banner */
+    /* Active File Info Bar */
     .active-file-bar {
-      background: rgba(30, 41, 59, 0.5);
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      padding: 8px 16px;
-      font-size: 0.8rem;
       display: flex;
       justify-content: space-between;
+      padding: 8px 18px;
+      background: rgba(0, 0, 0, 0.4);
+      font-size: 0.75rem;
       color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
     .active-file-bar strong {
-      color: var(--text);
+      color: var(--primary);
     }
-    /* Tabs Navigation */
+    /* Nav Tabs */
     .tabs-nav {
-      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 65px;
       background: rgba(15, 23, 42, 0.95);
-      border-bottom: 1px solid var(--card-border);
-      padding: 6px 12px;
-      gap: 8px;
-      overflow-x: auto;
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 999;
     }
     .tab-btn {
-      flex: 1;
-      padding: 10px 8px;
-      border-radius: 12px;
       background: transparent;
       border: none;
       color: var(--text-muted);
-      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
       font-weight: 600;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      white-space: nowrap;
-      transition: all 0.2s;
+      flex: 1;
+      padding: 6px 0;
+      transition: all 0.2s ease;
     }
     .tab-btn.active {
-      background: rgba(56, 189, 248, 0.15);
       color: var(--primary);
-      border: 1px solid rgba(56, 189, 248, 0.3);
     }
-    /* Content Views */
+    .tab-btn span {
+      font-size: 1.25rem;
+    }
+    /* Views */
     .view-content {
       display: none;
-      padding: 16px;
       flex: 1;
-    }
-    .view-content.active {
-      display: flex;
+      padding: 16px;
       flex-direction: column;
       gap: 16px;
     }
-    /* AI Chat Tab */
+    .view-content.active {
+      display: flex;
+    }
+    /* Chat View */
     .chat-container {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 280px);
+      flex: 1;
+      height: calc(100vh - 200px);
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 20px;
@@ -295,7 +264,7 @@
     .chat-messages {
       flex: 1;
       overflow-y: auto;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -321,7 +290,7 @@
       color: var(--text);
       border: 1px solid rgba(56, 189, 248, 0.2);
       border-bottom-left-radius: 4px;
-      width: 95%;
+      width: 96%;
     }
     .code-box {
       background: var(--code-bg);
@@ -333,6 +302,7 @@
       font-size: 0.8rem;
       overflow-x: auto;
       color: #38bdf8;
+      user-select: text;
     }
     .code-actions {
       display: flex;
@@ -342,16 +312,15 @@
     .btn-apply-code {
       background: linear-gradient(135deg, #10b981, #059669);
       color: #fff;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 700;
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-radius: 10px;
       border: none;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
     }
     .btn-apply-code:active {
       transform: scale(0.96);
@@ -405,7 +374,7 @@
       color: #fff;
       border: none;
     }
-    /* Editor Control Tab */
+    /* Editor & Remote Cards */
     .editor-card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -450,33 +419,196 @@
     .secondary-btn:active {
       background: rgba(56, 189, 248, 0.2);
     }
-    /* Terminal Tab */
+    /* Terminal Console */
     .term-box {
       background: #020617;
       border: 1px solid #1e293b;
       border-radius: 14px;
       padding: 14px;
-      height: 200px;
+      height: 320px;
       overflow-y: auto;
-      font-family: monospace;
-      font-size: 0.75rem;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.78rem;
       color: #10b981;
       user-select: text;
+      line-height: 1.5;
     }
-    /* Files Tab */
-    .file-item {
+    .term-line {
+      word-break: break-all;
+      margin-bottom: 2px;
+    }
+    .term-cmd {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+    .chip-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .chip-btn {
+      background: #1e293b;
+      border: 1px solid rgba(56,189,248,0.3);
+      color: #f8fafc;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .chip-btn:active {
+      background: var(--primary);
+      color: #000;
+    }
+    /* Project Explorer / File Tree */
+    .tree-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .tree-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .tree-btn {
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tree-btn:active {
+      background: var(--primary);
+      color: #000;
+    }
+    .tree-container {
       background: var(--card-bg);
-      border: 1px solid rgba(255,255,255,0.05);
-      border-radius: 12px;
-      padding: 12px 16px;
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+    }
+    .tree-node {
+      display: flex;
+      flex-direction: column;
+    }
+    .tree-item-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 0.85rem;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .tree-item-row:hover, .tree-item-row:active {
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .tree-item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.86rem;
+    }
+    .tree-item-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tree-badge {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+    .tree-action-btn {
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 0.72rem;
+      padding: 4px 8px;
+      border-radius: 8px;
       cursor: pointer;
     }
-    .file-item:active {
-      border-color: var(--primary);
+    .tree-action-btn.open {
+      color: var(--primary);
+      border-color: rgba(56,189,248,0.4);
+    }
+    .tree-action-btn.del {
+      color: var(--danger);
+      border-color: rgba(239,68,68,0.4);
+    }
+    .tree-subfolder {
+      margin-left: 16px;
+      border-left: 1px dashed rgba(56, 189, 248, 0.25);
+      padding-left: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .tree-subfolder.collapsed {
+      display: none;
+    }
+    /* Modals */
+    .app-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 15, 25, 0.92);
+      backdrop-filter: blur(10px);
+      z-index: 10001;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .app-modal.show {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 20px;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-close {
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 1.2rem;
     }
     /* Toast */
     #toast {
@@ -510,7 +642,7 @@
     <div class="auth-card">
       <img src="/icon.png" style="width:72px; height:72px; border-radius:20px; margin-bottom:12px; box-shadow:0 8px 24px rgba(56,189,248,0.35); border:1px solid rgba(56,189,248,0.4);" alt="Da7eBot">
       <div class="auth-title">Da7eBot AI Remote</div>
-      <p class="auth-desc">Enter the 4-digit code shown on your laptop screen</p>
+      <p class="auth-desc">Enter the 4-digit PIN code displayed on your laptop screen</p>
       
       <input type="password" id="pinInput" class="pin-input" placeholder="••••" maxlength="6" inputmode="numeric" value="{{DEFAULT_PIN}}">
       
@@ -537,7 +669,7 @@
     <div style="display:flex; align-items:center; gap:8px;">
       <div class="status-badge" id="statusBadge">
         <div class="status-dot"></div>
-        <span id="statusText">Connected to Laptop</span>
+        <span id="statusText">Laptop Connected</span>
       </div>
     </div>
   </header>
@@ -548,34 +680,119 @@
     <div>Project: <strong id="currentProject">-</strong></div>
   </div>
 
-  <!-- Tabs Nav -->
+  <!-- Tabs Navigation -->
   <div class="tabs-nav">
-    <button class="tab-btn active" onclick="switchTab('aiTab')">🤖 Da7e AI</button>
-    <button class="tab-btn" onclick="switchTab('remoteTab')">🎮 Remote</button>
-    <button class="tab-btn" onclick="switchTab('editorTab')">📝 Editor</button>
-    <button class="tab-btn" onclick="switchTab('terminalTab')">💻 Terminal</button>
-    <button class="tab-btn" onclick="switchTab('filesTab')">📁 Files</button>
+    <button class="tab-btn active" onclick="switchTab('aiTab')"><span>🤖</span>Da7e AI</button>
+    <button class="tab-btn" onclick="switchTab('filesTab')"><span>📁</span>Files</button>
+    <button class="tab-btn" onclick="switchTab('terminalTab')"><span>💻</span>Terminal</button>
+    <button class="tab-btn" onclick="switchTab('editorTab')"><span>📝</span>Editor</button>
+    <button class="tab-btn" onclick="switchTab('remoteTab')"><span>🎮</span>Remote</button>
   </div>
 
   <!-- Tab 1: AI Chat -->
   <div id="aiTab" class="view-content active">
-    <!-- Chat Box -->
     <div class="chat-container">
       <div class="chat-messages" id="chatMsgs">
         <div class="msg ai">
           👋 Hello! I am <strong>Da7e AI</strong>.<br>
-          Connected live to VS Code on your laptop. Send any coding prompt, request bug fixes, or ask for features. I will format the code ready to insert into your laptop, and explain every step clearly! 🚀
+          Connected live to VS Code on your laptop. You have full project control from here:<br>
+          • <strong>اعمل فايل test.js</strong> (Create a file)<br>
+          • <strong>اعمل فولدر src</strong> (Create a folder)<br>
+          • <strong>نفذ امر dir</strong> (Run terminal command)<br>
+          • <strong>اقفل اللابتوب</strong> or <strong>علي الصوت</strong> (Laptop remote control)<br>
+          Send any request or code question, and I'll answer instantly! 🚀
         </div>
       </div>
       <div class="chat-input-bar">
         <button class="icon-btn" id="micBtn" onclick="toggleVoice()" title="Voice Input">🎙️</button>
-        <input type="text" id="aiInput" class="chat-input" placeholder="Ask Da7e AI to code, fix, or explain..." onkeydown="if(event.key==='Enter') sendAiMessage()">
+        <input type="text" id="aiInput" class="chat-input" placeholder="Ask Da7e AI or command laptop..." onkeydown="if(event.key==='Enter') sendAiMessage()">
         <button class="icon-btn send" onclick="sendAiMessage()">➤</button>
       </div>
     </div>
   </div>
 
-  <!-- Tab 2: Laptop Remote Control -->
+  <!-- Tab 2: Project Files & Folders Tree Explorer -->
+  <div id="filesTab" class="view-content">
+    <div class="tree-header">
+      <div style="font-weight:700; font-size:1rem; color:var(--primary); display:flex; align-items:center; gap:6px;">
+        <span>📁 Project Explorer:</span>
+        <span id="treeRootName" style="color:var(--text); font-size:0.85rem; font-weight:600;"></span>
+      </div>
+      <div class="tree-actions">
+        <button class="tree-btn" onclick="openNewFileModal()">➕ New File</button>
+        <button class="tree-btn" onclick="openNewFolderModal()">📁 New Folder</button>
+        <button class="tree-btn" onclick="loadProjectTree()">🔄</button>
+      </div>
+    </div>
+
+    <input type="text" id="fileFilterInput" class="chat-input" placeholder="🔍 Search files & folders..." oninput="filterTree(this.value)">
+
+    <div class="tree-container" id="treeContainer">
+      <div style="color:var(--text-muted); text-align:center; padding:24px;">Loading project files and folders...</div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Terminal Control & Output -->
+  <div id="terminalTab" class="view-content">
+    <div class="editor-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; color:var(--primary); font-size:0.95rem;">💻 Terminal Commands:</span>
+        <button class="secondary-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="clearTerminalScreen()">🧹 Clear</button>
+      </div>
+      
+      <div class="chip-scroll">
+        <button class="chip-btn" onclick="runActiveFile()">▶️ Run Active File</button>
+        <button class="chip-btn" onclick="runTerminalCommand('npm test')">🧪 npm test</button>
+        <button class="chip-btn" onclick="runTerminalCommand('npm start')">🚀 npm start</button>
+        <button class="chip-btn" onclick="runTerminalCommand('git status')">🌿 git status</button>
+        <button class="chip-btn" onclick="runTerminalCommand('git pull')">📥 git pull</button>
+        <button class="chip-btn" onclick="runTerminalCommand('dir')">📂 dir / ls</button>
+        <button class="chip-btn" onclick="runTerminalCommand('node -v')">⚡ node -v</button>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="customCmdInput" class="chat-input" placeholder="Type terminal command (e.g. dir, git status)..." onkeydown="if(event.key==='Enter') runCustomTerminal()">
+        <button class="btn" style="width:80px;" id="runCmdBtn" onclick="runCustomTerminal()">Run</button>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+      <span style="font-size:0.85rem; color:var(--text-muted);">Live Terminal Console:</span>
+      <button class="secondary-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="copyTerminalOutput()">📋 Copy Output</button>
+    </div>
+    <div class="term-box" id="termOutput">
+      <div class="term-line" style="color:#38bdf8;">[Da7e AI Terminal Stream Connected]</div>
+    </div>
+  </div>
+
+  <!-- Tab 4: Editor Control -->
+  <div id="editorTab" class="view-content">
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">Send Code to VS Code:</div>
+      <textarea id="editorInput" class="editor-textarea" placeholder="// Type or paste code here to insert into your laptop..."></textarea>
+      
+      <div class="editor-btn-grid">
+        <button class="btn" onclick="insertCodeToVSCode()">
+          <span>📥 Insert in Laptop Editor</span>
+        </button>
+        <button class="secondary-btn" onclick="replaceSelectionInVSCode()">
+          <span>🔄 Replace Selection</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--text); font-size:0.95rem;">Remote Editor Controls:</div>
+      <div class="editor-btn-grid">
+        <button class="secondary-btn" onclick="editorAction('save')">💾 Save (Ctrl+S)</button>
+        <button class="secondary-btn" onclick="editorAction('format')">✨ Format Code</button>
+        <button class="secondary-btn" onclick="editorAction('undo')">↩️ Undo</button>
+        <button class="secondary-btn" onclick="editorAction('redo')">↪️ Redo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 5: Laptop Remote Control -->
   <div id="remoteTab" class="view-content">
     <!-- Sound & Media Controls -->
     <div class="editor-card">
@@ -640,64 +857,51 @@
     </div>
   </div>
 
-  <!-- Tab 3: Editor Control -->
-  <div id="editorTab" class="view-content">
-    <div class="editor-card">
-      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">Send Code to VS Code:</div>
-      <textarea id="editorInput" class="editor-textarea" placeholder="// Type or paste code here to insert into your laptop..."></textarea>
-      
-      <div class="editor-btn-grid">
-        <button class="btn" onclick="insertCodeToVSCode()">
-          <span>📥 Insert in Laptop Editor</span>
-        </button>
-        <button class="secondary-btn" onclick="replaceSelectionInVSCode()">
-          <span>🔄 Replace Selection</span>
-        </button>
+  <!-- Modal: New File -->
+  <div id="newFileModal" class="app-modal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span>📄 Create New File</span>
+        <span class="modal-close" onclick="closeNewFileModal()">✕</span>
       </div>
-    </div>
-
-    <div class="editor-card">
-      <div style="font-weight:700; color:var(--text); font-size:0.95rem;">Remote Editor Controls:</div>
-      <div class="editor-btn-grid">
-        <button class="secondary-btn" onclick="editorAction('save')">💾 Save (Ctrl+S)</button>
-        <button class="secondary-btn" onclick="editorAction('format')">✨ Format Code</button>
-        <button class="secondary-btn" onclick="editorAction('undo')">↩️ Undo</button>
-        <button class="secondary-btn" onclick="editorAction('redo')">↪️ Redo</button>
+      <div style="font-size:0.85rem; color:var(--text-muted);">Enter file name or path (e.g. <code>src/index.js</code> or <code>style.css</code>):</div>
+      <input type="text" id="newFilePathInput" class="chat-input" placeholder="e.g. app.js or src/components/Header.jsx">
+      <textarea id="newFileContentInput" class="editor-textarea" style="height:90px;" placeholder="Optional: write starting code or template..."></textarea>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" onclick="submitCreateFile()">Create & Open in VS Code</button>
+        <button class="secondary-btn" style="width:90px;" onclick="closeNewFileModal()">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Tab 3: Terminal Control -->
-  <div id="terminalTab" class="view-content">
-    <div class="editor-card">
-      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">Terminal & Run Commands:</div>
-      <div class="editor-btn-grid">
-        <button class="btn" onclick="runActiveFile()">▶️ Run Active File</button>
-        <button class="secondary-btn" onclick="runTerminalCommand('npm start')">🚀 npm start</button>
-        <button class="secondary-btn" onclick="runTerminalCommand('git status')">🌿 git status</button>
-        <button class="secondary-btn" onclick="runTerminalCommand('clear')">🧹 Clear</button>
+  <!-- Modal: New Folder -->
+  <div id="newFolderModal" class="app-modal">
+    <div class="modal-box">
+      <div class="modal-title">
+        <span>📁 Create New Folder</span>
+        <span class="modal-close" onclick="closeNewFolderModal()">✕</span>
       </div>
-
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <input type="text" id="customCmdInput" class="chat-input" placeholder="Type terminal command here...">
-        <button class="btn" style="width:80px;" onclick="runCustomTerminal()">Run</button>
+      <div style="font-size:0.85rem; color:var(--text-muted);">Enter folder name or path (e.g. <code>components</code> or <code>src/utils</code>):</div>
+      <input type="text" id="newFolderPathInput" class="chat-input" placeholder="e.g. src/components">
+      <div style="display:flex; gap:10px;">
+        <button class="btn" onclick="submitCreateFolder()">Create Folder</button>
+        <button class="secondary-btn" style="width:90px;" onclick="closeNewFolderModal()">Cancel</button>
       </div>
-    </div>
-
-    <div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">Live Terminal Stream:</div>
-    <div class="term-box" id="termOutput">
-      [Da7e AI Terminal Connected...]
     </div>
   </div>
 
-  <!-- Tab 4: Project Files -->
-  <div id="filesTab" class="view-content">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <span style="font-weight:700;">Workspace Files:</span>
-      <button class="secondary-btn" style="padding:6px 12px; font-size:0.75rem;" onclick="loadFiles()">🔄 Refresh</button>
-    </div>
-    <div id="filesList" style="display:flex; flex-direction:column; gap:8px;">
-      <div class="file-item">Tap refresh to load workspace files...</div>
+  <!-- Modal: View File Code -->
+  <div id="viewFileModal" class="app-modal">
+    <div class="modal-box" style="max-width:540px;">
+      <div class="modal-title">
+        <span id="viewFileTitle" style="font-size:0.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📄 File View</span>
+        <span class="modal-close" onclick="closeViewFileModal()">✕</span>
+      </div>
+      <div id="viewFileCodeBox" class="code-box" style="max-height:360px; overflow-y:auto; white-space:pre;"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="viewFileOpenBtn" style="font-size:0.85rem;">⚡ Open in Laptop VS Code</button>
+        <button class="secondary-btn" id="viewFileCopyBtn" style="width:100px; font-size:0.85rem;">📋 Copy</button>
+      </div>
     </div>
   </div>
 
@@ -708,9 +912,9 @@
     let authToken = localStorage.getItem('da7e_token') || '';
     let currentActiveCode = '';
     let deferredPrompt = null;
-    let scannerStream = null;
+    let cachedTreeData = [];
 
-    // Handle PWA Installation
+    // PWA Support
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -800,7 +1004,7 @@
           document.getElementById('authOverlay').style.display = 'none';
           showToast('🎉 تم قبول الاتصال بنجاح!');
           refreshStatus();
-          loadFiles();
+          loadProjectTree();
         } else if (res.status === 403) {
           statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ تم رفض الاتصال من شاشة اللابتوب.</div>';
           btn.disabled = false;
@@ -820,6 +1024,7 @@
         if (res.ok) {
           document.getElementById('authOverlay').style.display = 'none';
           refreshStatus();
+          loadProjectTree();
         } else {
           document.getElementById('authOverlay').style.display = 'flex';
         }
@@ -833,6 +1038,9 @@
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
       event.currentTarget.classList.add('active');
+      if (tabId === 'filesTab') {
+        loadProjectTree();
+      }
     }
 
     function initSSE() {
@@ -845,15 +1053,38 @@
             document.getElementById('currentProject').innerText = data.workspaceName || '-';
             currentActiveCode = data.selectedCode || data.fileContent || '';
           } else if (data.type === 'terminal') {
-            const term = document.getElementById('termOutput');
-            term.innerHTML += '<div>' + escapeHtml(data.line) + '</div>';
-            term.scrollTop = term.scrollHeight;
+            appendTerminalLine(data.line);
           } else if (data.type === 'chatSync' && data.sender === 'laptop') {
             appendMessage(data.prompt, 'user', '💻 From Laptop');
             appendAiResponse(data.reply);
+          } else if (data.type === 'fileCreated' || data.type === 'folderCreated' || data.type === 'pathDeleted') {
+            loadProjectTree();
           }
         } catch (e) {}
       };
+    }
+
+    function appendTerminalLine(line) {
+      const term = document.getElementById('termOutput');
+      const div = document.createElement('div');
+      div.className = 'term-line';
+      if (line.startsWith('$ ')) {
+        div.className += ' term-cmd';
+      }
+      div.innerText = line;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearTerminalScreen() {
+      document.getElementById('termOutput').innerHTML = '<div class="term-line" style="color:#38bdf8;">[Terminal Cleared]</div>';
+    }
+
+    function copyTerminalOutput() {
+      const term = document.getElementById('termOutput');
+      navigator.clipboard.writeText(term.innerText).then(() => {
+        showToast('📋 Terminal output copied to clipboard');
+      });
     }
 
     async function refreshStatus() {
@@ -894,10 +1125,6 @@
       }
     }
 
-    function quickPrompt(text) {
-      sendAiMessage(text);
-    }
-
     function appendMessage(text, sender, label, shouldSave) {
       if (shouldSave !== false) {
         saveChatItem({ isAi: false, text, sender, label });
@@ -920,6 +1147,411 @@
       document.getElementById('chatMsgs').appendChild(div);
       div.scrollIntoView({ behavior: 'smooth' });
       return id;
+    }
+
+    function appendAiResponse(text, shouldSave) {
+      if (shouldSave !== false) {
+        saveChatItem({ isAi: true, text });
+      }
+      const div = document.createElement('div');
+      div.className = 'msg ai';
+      
+      const codeBlockRegex = /```([\s\S]*?)```/g;
+      let lastIndex = 0;
+      let match;
+      let html = '';
+
+      while ((match = codeBlockRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          html += '<div>' + escapeHtml(text.substring(lastIndex, match.index)).replace(/\n/g, '<br>') + '</div>';
+        }
+        const blockContent = match[1].trim();
+        const lines = blockContent.split('\n');
+        const lang = lines[0].trim();
+        const code = (lang && !lang.includes(' ') && lines.length > 1) ? lines.slice(1).join('\n') : blockContent;
+        const encodedCode = encodeURIComponent(code);
+
+        html += '<div class="code-box"><code>' + escapeHtml(code) + '</code></div>';
+        html += '<div class="code-actions">' +
+                '<button class="btn-apply-code" onclick="sendExtractedCode(\'' + encodedCode + '\')">⚡ Send to Laptop (VS Code)</button>' +
+                '<button class="btn-copy-code" onclick="copyCode(\'' + encodedCode + '\')">📋 Copy</button>' +
+                '</div>';
+        lastIndex = codeBlockRegex.lastIndex;
+      }
+
+      if (lastIndex < text.length) {
+        html += '<div>' + escapeHtml(text.substring(lastIndex)).replace(/\n/g, '<br>') + '</div>';
+      }
+
+      div.innerHTML = html;
+      document.getElementById('chatMsgs').appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function copyCode(encodedCode) {
+      const code = decodeURIComponent(encodedCode);
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('📋 Code copied to clipboard');
+      });
+    }
+
+    function sendExtractedCode(encodedCode) {
+      const code = decodeURIComponent(encodedCode);
+      insertCodeDirect(code);
+    }
+
+    // Terminal Commands Execution
+    async function runTerminalCommand(cmd) {
+      if (!cmd) return;
+      appendTerminalLine('$ ' + cmd);
+      try {
+        const res = await fetch('/api/terminal/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd, token: authToken })
+        });
+        const data = await res.json();
+        if (data.output) {
+          data.output.split('\n').forEach(line => appendTerminalLine(line));
+        }
+        showToast('💻 Terminal executed: ' + cmd);
+      } catch (e) {
+        appendTerminalLine('⚠️ Execution error: ' + e.message);
+      }
+    }
+
+    function runCustomTerminal() {
+      const input = document.getElementById('customCmdInput');
+      const cmd = input.value.trim();
+      if (!cmd) return;
+      input.value = '';
+      runTerminalCommand(cmd);
+    }
+
+    async function runActiveFile() {
+      try {
+        await fetch('/api/terminal/run-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: authToken })
+        });
+        showToast('▶️ Running active file in laptop terminal...');
+      } catch (e) {
+        showToast('⚠️ Error: ' + e.message);
+      }
+    }
+
+    // File Tree & Management
+    function getFileIcon(filename) {
+      const lower = filename.toLowerCase();
+      if (lower.endsWith('.js') || lower.endsWith('.ts') || lower.endsWith('.jsx') || lower.endsWith('.tsx')) return '📜';
+      if (lower.endsWith('.py')) return '🐍';
+      if (lower.endsWith('.html') || lower.endsWith('.htm')) return '🌐';
+      if (lower.endsWith('.css') || lower.endsWith('.scss')) return '🎨';
+      if (lower.endsWith('.json') || lower.endsWith('.yaml') || lower.endsWith('.yml')) return '📦';
+      if (lower.endsWith('.java') || lower.endsWith('.kt')) return '☕';
+      if (lower.endsWith('.md') || lower.endsWith('.txt')) return '📝';
+      if (lower.endsWith('.sh') || lower.endsWith('.bat') || lower.endsWith('.ps1')) return '⚡';
+      if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.svg')) return '🖼️';
+      return '📄';
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+    }
+
+    async function loadProjectTree() {
+      const container = document.getElementById('treeContainer');
+      try {
+        const res = await fetch('/api/tree?token=' + authToken);
+        const data = await res.json();
+        document.getElementById('treeRootName').innerText = `(${data.root || 'Workspace'})`;
+        cachedTreeData = data.tree || [];
+        renderTree(cachedTreeData, container);
+      } catch (err) {
+        container.innerHTML = '<div style="color:#ef4444; padding:16px;">Error loading project tree: ' + err.message + '</div>';
+      }
+    }
+
+    function renderTree(nodes, parentEl) {
+      parentEl.innerHTML = '';
+      if (!nodes || nodes.length === 0) {
+        parentEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:20px;">No files found in workspace</div>';
+        return;
+      }
+
+      function buildDom(items, target) {
+        items.forEach(node => {
+          const nodeWrapper = document.createElement('div');
+          nodeWrapper.className = 'tree-node';
+
+          const row = document.createElement('div');
+          row.className = 'tree-item-row';
+
+          if (node.type === 'folder') {
+            const childCount = node.children ? node.children.length : 0;
+            row.innerHTML = `
+              <div class="tree-item-left">
+                <span class="folder-icon">📁</span>
+                <span style="font-weight:700; color:var(--text);">${escapeHtml(node.name)}</span>
+                <span class="tree-badge">${childCount}</span>
+              </div>
+              <div class="tree-item-right">
+                <button class="tree-action-btn del" onclick="event.stopPropagation(); deletePath('${escapeHtml(node.path)}')">🗑️</button>
+              </div>
+            `;
+
+            const subContainer = document.createElement('div');
+            subContainer.className = 'tree-subfolder';
+
+            row.onclick = () => {
+              const isCollapsed = subContainer.classList.toggle('collapsed');
+              const icon = row.querySelector('.folder-icon');
+              if (icon) icon.innerText = isCollapsed ? '📁' : '📂';
+            };
+
+            if (node.children && node.children.length > 0) {
+              buildDom(node.children, subContainer);
+            } else {
+              subContainer.innerHTML = '<div style="color:#64748b; font-size:0.75rem; padding:4px 8px;">Empty folder</div>';
+            }
+
+            nodeWrapper.appendChild(row);
+            nodeWrapper.appendChild(subContainer);
+          } else {
+            const icon = getFileIcon(node.name);
+            row.innerHTML = `
+              <div class="tree-item-left" onclick="viewFileModalOpen('${escapeHtml(node.path)}')">
+                <span>${icon}</span>
+                <span style="color:#f8fafc;">${escapeHtml(node.name)}</span>
+                <span class="tree-badge">${formatBytes(node.size)}</span>
+              </div>
+              <div class="tree-item-right">
+                <button class="tree-action-btn open" onclick="openFileInLaptop('${escapeHtml(node.path)}')">⚡ Open</button>
+                <button class="tree-action-btn" onclick="viewFileModalOpen('${escapeHtml(node.path)}')">👁️ View</button>
+                <button class="tree-action-btn del" onclick="deletePath('${escapeHtml(node.path)}')">🗑️</button>
+              </div>
+            `;
+            nodeWrapper.appendChild(row);
+          }
+
+          target.appendChild(nodeWrapper);
+        });
+      }
+
+      buildDom(nodes, parentEl);
+    }
+
+    function filterTree(query) {
+      if (!query || !query.trim()) {
+        renderTree(cachedTreeData, document.getElementById('treeContainer'));
+        return;
+      }
+      const q = query.trim().toLowerCase();
+
+      function filterNodes(items) {
+        const filtered = [];
+        for (const item of items) {
+          if (item.type === 'file') {
+            if (item.name.toLowerCase().includes(q) || item.path.toLowerCase().includes(q)) {
+              filtered.push(item);
+            }
+          } else if (item.type === 'folder') {
+            const matchingChildren = filterNodes(item.children || []);
+            if (matchingChildren.length > 0 || item.name.toLowerCase().includes(q)) {
+              filtered.push({
+                ...item,
+                children: matchingChildren
+              });
+            }
+          }
+        }
+        return filtered;
+      }
+
+      const res = filterNodes(cachedTreeData);
+      renderTree(res, document.getElementById('treeContainer'));
+    }
+
+    async function openFileInLaptop(relPath) {
+      try {
+        await fetch('/api/editor/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: relPath, token: authToken })
+        });
+        showToast('📂 Opened ' + relPath + ' in VS Code');
+      } catch (e) {
+        showToast('⚠️ Error: ' + e.message);
+      }
+    }
+
+    async function deletePath(relPath) {
+      if (!confirm('Are you sure you want to delete: ' + relPath + '?')) return;
+      try {
+        const res = await fetch('/api/files/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: relPath, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('🗑️ Deleted ' + relPath);
+          loadProjectTree();
+        } else {
+          alert('Delete failed: ' + data.error);
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    // New File Modal
+    function openNewFileModal() {
+      document.getElementById('newFilePathInput').value = '';
+      document.getElementById('newFileContentInput').value = '';
+      document.getElementById('newFileModal').classList.add('show');
+    }
+    function closeNewFileModal() {
+      document.getElementById('newFileModal').classList.remove('show');
+    }
+    async function submitCreateFile() {
+      const pathVal = document.getElementById('newFilePathInput').value.trim();
+      const contentVal = document.getElementById('newFileContentInput').value;
+      if (!pathVal) return alert('Please enter file path');
+
+      try {
+        const res = await fetch('/api/files/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pathVal, content: contentVal, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeNewFileModal();
+          showToast('📄 Created & Opened: ' + data.path);
+          loadProjectTree();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    // New Folder Modal
+    function openNewFolderModal() {
+      document.getElementById('newFolderPathInput').value = '';
+      document.getElementById('newFolderModal').classList.add('show');
+    }
+    function closeNewFolderModal() {
+      document.getElementById('newFolderModal').classList.remove('show');
+    }
+    async function submitCreateFolder() {
+      const pathVal = document.getElementById('newFolderPathInput').value.trim();
+      if (!pathVal) return alert('Please enter folder path');
+
+      try {
+        const res = await fetch('/api/folders/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: pathVal, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeNewFolderModal();
+          showToast('📁 Created Folder: ' + data.path);
+          loadProjectTree();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    // View File Modal
+    async function viewFileModalOpen(relPath) {
+      document.getElementById('viewFileTitle').innerText = '📄 ' + relPath;
+      document.getElementById('viewFileCodeBox').innerText = 'Loading file contents...';
+      document.getElementById('viewFileModal').classList.add('show');
+
+      try {
+        const res = await fetch('/api/files/read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: relPath, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('viewFileCodeBox').innerText = data.content || '(Empty file)';
+          document.getElementById('viewFileOpenBtn').onclick = () => openFileInLaptop(relPath);
+          document.getElementById('viewFileCopyBtn').onclick = () => {
+            navigator.clipboard.writeText(data.content).then(() => showToast('📋 File copied!'));
+          };
+        } else {
+          document.getElementById('viewFileCodeBox').innerText = 'Error: ' + data.error;
+        }
+      } catch (e) {
+        document.getElementById('viewFileCodeBox').innerText = 'Error loading file: ' + e.message;
+      }
+    }
+    function closeViewFileModal() {
+      document.getElementById('viewFileModal').classList.remove('show');
+    }
+
+    // Remote Actions & Editor
+    async function insertCodeToVSCode() {
+      const text = document.getElementById('editorInput').value;
+      if (!text) return alert('Please enter code first');
+      await insertCodeDirect(text);
+    }
+
+    async function insertCodeDirect(text) {
+      try {
+        const res = await fetch('/api/editor/insert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: text, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('⚡ Code inserted into laptop successfully!');
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (e) {
+        alert('Insert failed: ' + e.message);
+      }
+    }
+
+    async function replaceSelectionInVSCode() {
+      const text = document.getElementById('editorInput').value;
+      try {
+        const res = await fetch('/api/editor/replace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: text, token: authToken })
+        });
+        showToast('🔄 Replaced selection in laptop');
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function editorAction(action) {
+      try {
+        await fetch('/api/editor/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, token: authToken })
+        });
+        showToast('Executed: ' + action);
+      } catch (e) {}
     }
 
     async function systemControl(action) {
@@ -986,57 +1618,6 @@
       } catch (e) {}
     }
 
-    function appendAiResponse(text, shouldSave) {
-      if (shouldSave !== false) {
-        saveChatItem({ isAi: true, text });
-      }
-      const div = document.createElement('div');
-      div.className = 'msg ai';
-      
-      const codeBlockRegex = /```([\s\S]*?)```/g;
-      let lastIndex = 0;
-      let match;
-      let html = '';
-
-      while ((match = codeBlockRegex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-          html += '<div>' + escapeHtml(text.substring(lastIndex, match.index)).replace(/\n/g, '<br>') + '</div>';
-        }
-        const blockContent = match[1].trim();
-        const lines = blockContent.split('\n');
-        const lang = lines[0].trim();
-        const code = (lang && !lang.includes(' ') && lines.length > 1) ? lines.slice(1).join('\n') : blockContent;
-        const encodedCode = encodeURIComponent(code);
-
-        html += '<div class="code-box"><code>' + escapeHtml(code) + '</code></div>';
-        html += '<div class="code-actions">' +
-                '<button class="btn-apply-code" onclick="sendExtractedCode(\'' + encodedCode + '\')">⚡ Send to Laptop (VS Code)</button>' +
-                '<button class="btn-copy-code" onclick="copyCode(\'' + encodedCode + '\')">📋 Copy</button>' +
-                '</div>';
-        lastIndex = codeBlockRegex.lastIndex;
-      }
-
-      if (lastIndex < text.length) {
-        html += '<div>' + escapeHtml(text.substring(lastIndex)).replace(/\n/g, '<br>') + '</div>';
-      }
-
-      div.innerHTML = html;
-      document.getElementById('chatMsgs').appendChild(div);
-      div.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function copyCode(encodedCode) {
-      const code = decodeURIComponent(encodedCode);
-      navigator.clipboard.writeText(code).then(() => {
-        showToast('📋 Code copied to clipboard');
-      });
-    }
-
-    function sendExtractedCode(encodedCode) {
-      const code = decodeURIComponent(encodedCode);
-      insertCodeDirect(code);
-    }
-
     let recognition = null;
     function toggleVoice() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1066,115 +1647,6 @@
       } else {
         recognition.stop();
       }
-    }
-
-    async function insertCodeToVSCode() {
-      const text = document.getElementById('editorInput').value;
-      if (!text) return alert('Please enter code first');
-      await insertCodeDirect(text);
-    }
-
-    async function insertCodeDirect(text) {
-      try {
-        const res = await fetch('/api/editor/insert', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: text, token: authToken })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast('⚡ Code inserted into laptop successfully!');
-        } else {
-          alert('Error: ' + data.error);
-        }
-      } catch (e) {
-        alert('Insert failed: ' + e.message);
-      }
-    }
-
-    async function replaceSelectionInVSCode() {
-      const text = document.getElementById('editorInput').value;
-      try {
-        const res = await fetch('/api/editor/replace', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: text, token: authToken })
-        });
-        showToast('🔄 Replaced selection in laptop');
-      } catch (e) {
-        alert(e.message);
-      }
-    }
-
-    async function editorAction(action) {
-      try {
-        await fetch('/api/editor/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, token: authToken })
-        });
-        showToast('Executed: ' + action);
-      } catch (e) {}
-    }
-
-    async function runActiveFile() {
-      try {
-        await fetch('/api/terminal/run-file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: authToken })
-        });
-        showToast('▶️ Running file in laptop terminal...');
-      } catch (e) {}
-    }
-
-    async function runTerminalCommand(cmd) {
-      try {
-        await fetch('/api/terminal/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: cmd, token: authToken })
-        });
-        showToast('Sent command: ' + cmd);
-      } catch (e) {}
-    }
-
-    function runCustomTerminal() {
-      const cmd = document.getElementById('customCmdInput').value.trim();
-      if (!cmd) return;
-      runTerminalCommand(cmd);
-      document.getElementById('customCmdInput').value = '';
-    }
-
-    async function loadFiles() {
-      try {
-        const res = await fetch('/api/files?token=' + authToken);
-        const data = await res.json();
-        const list = document.getElementById('filesList');
-        list.innerHTML = '';
-        if (!data.files || data.files.length === 0) {
-          list.innerHTML = '<div class="file-item">No files found in workspace</div>';
-          return;
-        }
-        data.files.forEach(f => {
-          const item = document.createElement('div');
-          item.className = 'file-item';
-          item.innerHTML = '<span>📄 ' + escapeHtml(f) + '</span><span style="color:var(--primary); font-size:0.75rem;">Open in Laptop ↗</span>';
-          item.onclick = () => openFile(f);
-          list.appendChild(item);
-        });
-      } catch (e) {}
-    }
-
-    async function openFile(filename) {
-      try {
-        await fetch('/api/editor/open', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file: filename, token: authToken })
-        });
-        showToast('📂 Opened ' + filename + ' in VS Code');
-      } catch (e) {}
     }
 
     function escapeHtml(str) {

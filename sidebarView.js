@@ -291,11 +291,11 @@ class Da7eSidebarProvider {
     </div>
 
     <div class="chat-box" id="sidebarChatBox">
-      ${historyHtml || '<div style="color:#94a3b8; text-align:center; margin-top:40px;">Ready! Type a message or say: "اقفل اللابتوب", "علي الصوت", "احفظ الملف"...</div>'}
+      ${historyHtml || '<div style="color:#94a3b8; text-align:center; margin-top:40px;">Ready! Type a message or say: "اعمل فايل test.js", "اعمل فولدر src", "نفذ امر dir", "اقفل اللابتوب"...</div>'}
     </div>
 
     <div class="input-bar">
-      <input type="text" id="sidebarPrompt" placeholder="Message Da7e AI or command laptop..." onkeydown="if(event.key==='Enter') sendPrompt()">
+      <input type="text" id="sidebarPrompt" placeholder="Message Da7e AI, create file, run cmd..." onkeydown="if(event.key==='Enter') sendPrompt()">
       <button onclick="sendPrompt()">Send</button>
     </div>
   </div>

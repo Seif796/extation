@@ -64,6 +64,145 @@ class LanServer {
     return this.phoneConnected || this.sseClients.size > 0 || this.connectedPhonesCount > 0;
   }
 
+  getWorkspaceRoot() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (folders && folders.length > 0) {
+      return folders[0].uri.fsPath;
+    }
+    return process.cwd();
+  }
+
+  resolveSafePath(relPath) {
+    if (!relPath || typeof relPath !== 'string') {
+      throw new Error('Invalid path provided');
+    }
+    const cleanRel = relPath.trim().replace(/^[\/\\]+/, '');
+    const root = this.getWorkspaceRoot();
+    const fullPath = path.resolve(root, cleanRel);
+    const normalizedRoot = path.normalize(root).toLowerCase();
+    const normalizedPath = path.normalize(fullPath).toLowerCase();
+    if (!normalizedPath.startsWith(normalizedRoot)) {
+      throw new Error('Access outside workspace root is not allowed');
+    }
+    return fullPath;
+  }
+
+  getWorkspaceTree(dirPath = this.getWorkspaceRoot(), relativePath = '', depth = 0) {
+    if (depth > 5) return [];
+    const ignored = new Set([
+      'node_modules', '.git', '.gradle', 'build', '.vscode', 'dist', 'bin', 'obj', '.gemini', '.idea', '.system_generated'
+    ]);
+    try {
+      if (!fs.existsSync(dirPath)) return [];
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      const items = [];
+      const sorted = entries.sort((a, b) => {
+        if (a.isDirectory() === b.isDirectory()) return a.name.localeCompare(b.name);
+        return a.isDirectory() ? -1 : 1;
+      });
+
+      for (const entry of sorted) {
+        if (ignored.has(entry.name)) continue;
+        const entryRelPath = relativePath ? path.join(relativePath, entry.name).replace(/\\/g, '/') : entry.name;
+        const fullPath = path.join(dirPath, entry.name);
+
+        if (entry.isDirectory()) {
+          items.push({
+            name: entry.name,
+            type: 'folder',
+            path: entryRelPath,
+            children: this.getWorkspaceTree(fullPath, entryRelPath, depth + 1)
+          });
+        } else {
+          let size = 0;
+          try { size = fs.statSync(fullPath).size; } catch (e) {}
+          items.push({
+            name: entry.name,
+            type: 'file',
+            path: entryRelPath,
+            size
+          });
+        }
+      }
+      return items;
+    } catch (err) {
+      return [];
+    }
+  }
+
+  async createWorkspaceFile(relPath, content = '') {
+    const fullPath = this.resolveSafePath(relPath);
+    const parentDir = path.dirname(fullPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+    fs.writeFileSync(fullPath, content || '', 'utf8');
+    const doc = await vscode.workspace.openTextDocument(fullPath);
+    await vscode.window.showTextDocument(doc);
+    const relative = path.relative(this.getWorkspaceRoot(), fullPath).replace(/\\/g, '/');
+    this.broadcastSSE({ type: 'fileCreated', path: relative });
+    return relative;
+  }
+
+  createWorkspaceFolder(relPath) {
+    const fullPath = this.resolveSafePath(relPath);
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+    }
+    const relative = path.relative(this.getWorkspaceRoot(), fullPath).replace(/\\/g, '/');
+    this.broadcastSSE({ type: 'folderCreated', path: relative });
+    return relative;
+  }
+
+  deleteWorkspacePath(relPath) {
+    const fullPath = this.resolveSafePath(relPath);
+    if (fs.existsSync(fullPath)) {
+      const stat = fs.statSync(fullPath);
+      if (stat.isDirectory()) {
+        fs.rmSync(fullPath, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(fullPath);
+      }
+      const relative = path.relative(this.getWorkspaceRoot(), fullPath).replace(/\\/g, '/');
+      this.broadcastSSE({ type: 'pathDeleted', path: relative });
+      return relative;
+    }
+    throw new Error('File or folder not found: ' + relPath);
+  }
+
+  readWorkspaceFile(relPath) {
+    const fullPath = this.resolveSafePath(relPath);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error('File not found: ' + relPath);
+    }
+    return fs.readFileSync(fullPath, 'utf8');
+  }
+
+  executeTerminalCommand(cmd) {
+    if (!this.terminal || this.terminal.exitStatus !== undefined) {
+      this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
+    }
+    this.terminal.show(true);
+    this.terminal.sendText(cmd);
+    this.broadcastSSE({ type: 'terminal', line: `$ ${cmd}` });
+
+    return new Promise((resolve) => {
+      child_process.exec(cmd, { cwd: this.getWorkspaceRoot(), timeout: 20000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+        let output = (stdout || '') + (stderr || '');
+        if (err && !output) output = err.message;
+        if (!output.trim()) output = 'Command executed successfully (no terminal output).';
+        
+        const lines = output.split(/\r?\n/);
+        for (const l of lines) {
+          if (l.trim()) {
+            this.broadcastSSE({ type: 'terminal', line: l });
+          }
+        }
+        resolve(output.trim());
+      });
+    });
+  }
+
   start(customPort, customPin) {
     return new Promise((resolve) => {
       this.port = customPort || this.port || 38888;
@@ -148,80 +287,173 @@ class LanServer {
     if (!prompt || typeof prompt !== 'string') return null;
     const p = prompt.trim().toLowerCase();
 
-    // 1. Lock screen / Lock laptop workstation
+    // 1. Create File in Project (e.g. "اعمل فايل test.js", "create file src/index.js")
+    const createFileMatch = prompt.match(/^(?:اعمل|انشئ|انشىء|كريت|سوي|اصنع|create|make|new)\s+(?:فايل|ملف|file)\s+([^\s:]+)(?:[:\s]+(?:واكتب\s+فيه|واكتب\s+كود|with\s+content|content:)?\s*([\s\S]*))?$/i) ||
+                            prompt.match(/^touch\s+([^\s:]+)(?:[:\s]+([\s\S]*))?$/i);
+    if (createFileMatch) {
+      const filePath = createFileMatch[1].trim();
+      const content = (createFileMatch[2] || '').trim();
+      try {
+        const created = await this.createWorkspaceFile(filePath, content);
+        return `📄 **تم إنشاء وفتح الملف بنجاح في VS Code!**\n` +
+               `📁 **المسار:** \`${created}\`\n` +
+               (content ? `📝 **تمت كتابة المحتوى المطلوب داخل الملف.**` : `💡 الملف مفتوح وجاهز للتعديل الآن!`);
+      } catch (err) {
+        return `⚠️ **فشل إنشاء الملف:** ${err.message}`;
+      }
+    }
+
+    // 2. Create Folder in Project (e.g. "اعمل فولدر src", "create folder components")
+    const createFolderMatch = prompt.match(/^(?:اعمل|انشئ|انشىء|كريت|سوي|اصنع|create|make|new)\s+(?:فولدر|مجلد|دليل|folder|dir)\s+(.+)$/i) ||
+                              prompt.match(/^mkdir\s+(.+)$/i);
+    if (createFolderMatch) {
+      const folderPath = createFolderMatch[1].trim();
+      try {
+        const created = this.createWorkspaceFolder(folderPath);
+        return `📁 **تم إنشاء المجلد بنجاح في مشروعك!**\n` +
+               `📍 **المسار:** \`${created}\``;
+      } catch (err) {
+        return `⚠️ **فشل إنشاء المجلد:** ${err.message}`;
+      }
+    }
+
+    // 3. Delete File/Folder in Project (e.g. "احذف ملف test.js", "delete file old.txt")
+    const deleteMatch = prompt.match(/^(?:احذف|حذف|امسح|remove|delete)\s+(?:فايل|ملف|فولدر|مجلد|file|folder)\s+(.+)$/i) ||
+                        prompt.match(/^rm\s+(.+)$/i);
+    if (deleteMatch) {
+      const targetPath = deleteMatch[1].trim();
+      try {
+        const deleted = this.deleteWorkspacePath(targetPath);
+        return `🗑️ **تم حذف العنصر بنجاح من المشروع:** \`${deleted}\``;
+      } catch (err) {
+        return `⚠️ **فشل حذف العنصر:** ${err.message}`;
+      }
+    }
+
+    // 4. Read / View File in Project (e.g. "اقرا ملف package.json", "cat server.js")
+    const readFileMatch = prompt.match(/^(?:اقرا|إقرا|عرض|افتح|وريني|read|cat|view|open)\s+(?:فايل|ملف|file)\s+(.+)$/i) ||
+                          prompt.match(/^cat\s+(.+)$/i);
+    if (readFileMatch) {
+      const filePath = readFileMatch[1].trim();
+      try {
+        const content = this.readWorkspaceFile(filePath);
+        const ext = path.extname(filePath).replace('.', '') || 'text';
+        const preview = content.length > 2500 ? content.slice(0, 2500) + '\n\n... [Content truncated for chat preview]' : content;
+        return `📄 **محتوى الملف:** \`${filePath}\`\n\n\`\`\`${ext}\n${preview}\n\`\`\``;
+      } catch (err) {
+        return `⚠️ **فشل قراءة الملف:** ${err.message}`;
+      }
+    }
+
+    // 5. List Files / Project Tree (e.g. "وريني الملفات", "عرض الملفات", "ls", "dir")
+    if (/^(وريني\s*الملفات|عرض\s*الملفات|قائمة\s*الملفات|ملفات\s*المشروع|شجرة\s*الملفات|list\s*files|show\s*files|ls|dir)$/i.test(p)) {
+      try {
+        const tree = this.getWorkspaceTree();
+        const formatTree = (items, indent = '') => {
+          let res = '';
+          for (const it of items) {
+            if (it.type === 'folder') {
+              res += `${indent}📁 **${it.name}/**\n`;
+              if (it.children && it.children.length > 0) {
+                res += formatTree(it.children, indent + '   ');
+              }
+            } else {
+              res += `${indent}📄 \`${it.name}\`\n`;
+            }
+          }
+          return res;
+        };
+        const treeStr = formatTree(tree);
+        return `📂 **ملفات وفولدرات المشروع الحالي:**\n\n${treeStr || 'المشروع فارغ أو لا يحتوي على ملفات.'}\n\n💡 يمكنك قول: **اعمل فايل [الاسم]** أو **اعمل فولدر [الاسم]** لإنشاء عناصر جديدة!`;
+      } catch (err) {
+        return `⚠️ **حدث خطأ أثناء قراءة الملفات:** ${err.message}`;
+      }
+    }
+
+    // 6. Run Terminal Command (e.g. "نفذ امر dir", "cmd: git status", "امر npm test")
+    const termMatch = prompt.match(/^(?:نفذ\s*امر|نفذ\s*أمر|شغل\s*امر|شغل\s*أمر|امر|أمر|تيرمينال|تيرمنال|cmd:|run:|terminal:|\$)\s+(.+)$/i);
+    if (termMatch) {
+      const cmd = termMatch[1].trim();
+      if (cmd) {
+        const output = await this.executeTerminalCommand(cmd);
+        return `💻 **تم تنفيذ الأمر في تيرمينال اللابتوب:** \`$ ${cmd}\`\n\n\`\`\`bash\n${output}\n\`\`\``;
+      }
+    }
+
+    // 7. Lock screen / Lock laptop workstation
     if (/^(اقفل|قفل|قفل\s*شاشة|اقفل\s*شاشة|lock|قفل\s*الكمبيوتر)\s*(اللابتوب|الجهاز|الشاشه|الشاشة|الكمبيوتر|laptop|pc|screen)?$/i.test(p) ||
         p === 'اقفل اللابتوب' || p === 'قفل اللابتوب' || p === 'اقفل الجهاز' || p === 'قفل الجهاز' || p === 'lock' || p === 'lock laptop' || p === 'lock screen') {
       child_process.exec('rundll32.exe user32.dll,LockWorkStation');
       return '🔒 **تم قفل شاشة اللابتوب بنجاح وبسرعة فائقة!**';
     }
 
-    // 2. Volume Up
+    // 8. Volume Up
     if (/^(علي|ارفع|زود|رفع)\s*(الصوت|صوت)?$/i.test(p) || p.includes('علي الصوت') || p.includes('ارفع الصوت') || p === 'volume up' || p === 'vol up' || p === 'louder') {
       child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175)"');
       return '🔊 **تم رفع مستوى صوت اللابتوب!**';
     }
 
-    // 3. Volume Down
+    // 9. Volume Down
     if (/^(وطي|خفض|نقص|وطى)\s*(الصوت|صوت)?$/i.test(p) || p.includes('وطي الصوت') || p.includes('خفض الصوت') || p === 'volume down' || p === 'vol down' || p === 'quieter') {
       child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174)"');
       return '🔉 **تم خفض مستوى صوت اللابتوب!**';
     }
 
-    // 4. Mute / Unmute
+    // 10. Mute / Unmute
     if (/^(اكتم|كتم|صامت|سكات)\s*(الصوت)?$/i.test(p) || p === 'mute' || p === 'unmute' || p.includes('كتم الصوت')) {
       child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"');
       return '🔇 **تم تبديل / كتم صوت اللابتوب!**';
     }
 
-    // 5. Media Play / Pause
+    // 11. Media Play / Pause
     if (/^(شغل|وقف|شغل\s*وقف)\s*(الميديا|الفيديو|الموسيقى|الميوزك|فيديو)?$/i.test(p) || p === 'play' || p === 'pause' || p.includes('شغل الفيديو') || p.includes('وقف الفيديو')) {
       child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]179)"');
       return '⏯️ **تم تشغيل / إيقاف الميديا على اللابتوب!**';
     }
 
-    // 6. Save Files
+    // 12. Save Files
     if (p === 'احفظ' || p === 'احفظ الملف' || p === 'احفظ الملفات' || p === 'احفظ الكود' || p === 'احفظ الكل' || p === 'save' || p === 'save all') {
       await vscode.commands.executeCommand('workbench.action.files.saveAll');
       return '💾 **تم حفظ جميع الملفات في VS Code فوراً!**';
     }
 
-    // 7. Toggle Terminal
+    // 13. Toggle Terminal
     if (p === 'افتح التيرمينال' || p === 'اغلق التيرمينال' || p === 'التيرمينال' || p === 'تيرمينال' || p === 'terminal' || p === 'open terminal') {
       await vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal');
       return '⚡ **تم فتح / تبديل التيرمينال على اللابتوب!**';
     }
 
-    // 8. Run Active File
+    // 14. Run Active File
     if (p === 'شغل الكود' || p === 'شغل الملف' || p === 'شغل البرنامج' || p === 'run' || p === 'run file' || p === 'run code') {
       await this.runActiveFileInternal();
       return '▶️ **جاري تشغيل الكود في تيرمينال اللابتوب!**';
     }
 
-    // 9. Clear Terminal
+    // 15. Clear Terminal
     if (p === 'نظف التيرمينال' || p === 'امسح التيرمينال' || p === 'امسح الشاشة' || p === 'clear' || p === 'clear terminal') {
       await vscode.commands.executeCommand('workbench.action.terminal.clear');
       return '🧹 **تم تنظيف نافذة التيرمينال!**';
     }
 
-    // 10. Sleep Laptop
+    // 16. Sleep Laptop
     if (p === 'نوم اللابتوب' || p === 'نوم الجهاز' || p === 'وضع السكون' || p === 'sleep' || p === 'sleep laptop') {
       child_process.exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0');
       return '💤 **جاري وضع اللابتوب في وضع السكون (Sleep)!**';
     }
 
-    // 11. Shutdown Laptop with 60s timer
+    // 17. Shutdown Laptop with 60s timer
     if (p === 'اطفي اللابتوب' || p === 'اطفي الجهاز' || p === 'اغلق اللابتوب' || p === 'shutdown' || p === 'turn off laptop') {
       child_process.exec('shutdown /s /t 60');
       return '⚠️ **جاري إيقاف تشغيل اللابتوب بعد 60 ثانية!**\nإذا أردت إلغاء الإطفاء فوراً، اكتب في الشات: **الغي الاطفاء**';
     }
 
-    // 12. Cancel Shutdown
+    // 18. Cancel Shutdown
     if (p === 'الغي الاطفاء' || p === 'الغاء الاطفاء' || p === 'cancel shutdown' || p === 'abort shutdown') {
       child_process.exec('shutdown /a');
       return '✅ **تم إلغاء إيقاف تشغيل اللابتوب بنجاح!**';
     }
 
-    // 13. Copy text to laptop clipboard
+    // 19. Copy text to laptop clipboard
     if (p.startsWith('انسخ ') || p.startsWith('copy ')) {
       const textToCopy = prompt.replace(/^(انسخ|copy)\s+/i, '').trim();
       if (textToCopy) {
@@ -230,32 +462,20 @@ class LanServer {
       }
     }
 
-    // 14. Run command in terminal (e.g. "نفذ أمر dir", "cmd: git status")
-    if (p.startsWith('نفذ امر ') || p.startsWith('نفذ أمر ') || p.startsWith('شغل امر ') || p.startsWith('cmd: ') || p.startsWith('run: ')) {
-      const cmd = prompt.replace(/^(نفذ امر |نفذ أمر |شغل امر |cmd:\s*|run:\s*)/i, '').trim();
-      if (cmd) {
-        if (!this.terminal || this.terminal.exitStatus !== undefined) {
-          this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
-        }
-        this.terminal.show();
-        this.terminal.sendText(cmd);
-        this.broadcastSSE({ type: 'terminal', line: `$ ${cmd}` });
-        return `💻 **تم تشغيل الأمر في تيرمينال اللابتوب فوراً:** \`${cmd}\``;
-      }
-    }
-
-    // 15. Fast Chit-Chat & Greetings (10ms instant response)
+    // 20. Fast Chit-Chat & Greetings (10ms instant response)
     if (/^(سلام|سلام عليكم|السلام عليكم|مرحبا|أهلا|اهلا|ازيك|عامل ايه|صباح الخير|مساء الخير|hi|hello|hey)$/i.test(p)) {
       return '👋 **أهلاً بك! أنا Da7e AI، متحكم ومساعد لابتوبك السريع.**\n' +
              'أنا تحت أمرك وأستجيب في لحظات! جرب أن تكتب لي:\n' +
-             '• **اقفل اللابتوب** (لقفل الشاشة فوراً)\n' +
-             '• **علي الصوت** أو **وطي الصوت** أو **اكتم الصوت**\n' +
-             '• **احفظ الملفات** أو **افتح التيرمينال** أو **شغل الكود**\n' +
-             '• أو اسألني أي سؤال برمجي وسأجيبك بذكاء!';
+             '• **اعمل فايل test.js** (لإنشاء ملف جديد فوراً في المشروع)\n' +
+             '• **اعمل فولدر src/api** (لإنشاء مجلد جديد)\n' +
+             '• **نفذ امر dir** أو **نفذ امر git status** (لتشغيل الأوامر في التيرمينال)\n' +
+             '• **وريني الملفات** (لعرض شجرة ملفات المشروع)\n' +
+             '• **اقفل اللابتوب** أو **علي الصوت** أو **احفظ الملفات**\n' +
+             '• أو اسألني أي سؤال برمجي وسأجيبك بأذكى الحلول!';
     }
 
     if (/^(مين انت|من انت|who are you|انت مين)$/i.test(p)) {
-      return '🤖 **أنا Da7e AI:** مساعدك البرمجي الذكي وجهاز التحكم الكامل في اللابتوب عن بُعد من الهاتف، أستطيع كتابة الأكواد والتحكم في الصوت والشاشة والنظام فوراً!';
+      return '🤖 **أنا Da7e AI:** مساعدك البرمجي الذكي وجهاز التحكم الكامل في اللابتوب والمشاريع والتيرمينال عن بُعد، أستطيع إنشاء الملفات، تشغيل الأوامر، والتحكم في النظام فوراً!';
     }
 
     if (/^(شكرا|تسلم|الف شكر|thank you|thanks)$/i.test(p)) {
@@ -284,7 +504,7 @@ class LanServer {
       if (!this.terminal || this.terminal.exitStatus !== undefined) {
         this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
       }
-      this.terminal.show();
+      this.terminal.show(true);
       this.terminal.sendText(runCmd);
       this.broadcastSSE({ type: 'terminal', line: `$ ${runCmd}` });
     }
@@ -458,17 +678,95 @@ class LanServer {
       return res.end(JSON.stringify({ success: true }));
     }
 
-    // 8. Files
+    // 8. Files Flat List (Backwards Compatibility)
     if (pathname === '/api/files' && req.method === 'GET') {
-      const uris = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 50);
+      const uris = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 200);
       const files = uris.map(u => vscode.workspace.asRelativePath(u));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ files }));
     }
 
-    // 9. Open File
+    // 9. Full Recursive Project Files & Folders Tree
+    if (pathname === '/api/tree' && req.method === 'GET') {
+      const rootFolder = vscode.workspace.workspaceFolders?.[0];
+      const rootName = rootFolder ? rootFolder.name : path.basename(this.getWorkspaceRoot());
+      const tree = this.getWorkspaceTree();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ root: rootName, tree }));
+    }
+
+    // 10. Create New File in Project
+    if (pathname === '/api/files/create' && req.method === 'POST') {
+      const targetPath = body.path;
+      const content = body.content || '';
+      if (!targetPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: 'File path is required' }));
+      }
+      try {
+        const created = await this.createWorkspaceFile(targetPath, content);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true, path: created }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    // 11. Create New Folder in Project
+    if (pathname === '/api/folders/create' && req.method === 'POST') {
+      const targetPath = body.path;
+      if (!targetPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: 'Folder path is required' }));
+      }
+      try {
+        const created = this.createWorkspaceFolder(targetPath);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true, path: created }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    // 12. Read File Content
+    if (pathname === '/api/files/read' && req.method === 'POST') {
+      const targetFile = body.file || body.path;
+      if (!targetFile) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: 'File path is required' }));
+      }
+      try {
+        const content = this.readWorkspaceFile(targetFile);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true, content, path: targetFile }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    // 13. Delete File or Folder
+    if (pathname === '/api/files/delete' && req.method === 'POST') {
+      const targetPath = body.path;
+      if (!targetPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: 'Path is required' }));
+      }
+      try {
+        const deleted = this.deleteWorkspacePath(targetPath);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true, path: deleted }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    // 14. Open File in VS Code
     if (pathname === '/api/editor/open' && req.method === 'POST') {
-      const relativePath = body.file;
+      const relativePath = body.file || body.path;
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       if (workspaceFolder && relativePath) {
         const fullPath = path.join(workspaceFolder.uri.fsPath, relativePath);
@@ -479,27 +777,31 @@ class LanServer {
       return res.end(JSON.stringify({ success: true }));
     }
 
-    // 10. Run Terminal Command
+    // 15. Run Terminal Command (Interactive with output capture)
     if (pathname === '/api/terminal/run' && req.method === 'POST') {
       const cmd = body.command;
-      if (!this.terminal || this.terminal.exitStatus !== undefined) {
-        this.terminal = vscode.window.createTerminal('Da7e AI Terminal');
+      if (!cmd) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: 'Command is required' }));
       }
-      this.terminal.show();
-      this.terminal.sendText(cmd);
-      this.broadcastSSE({ type: 'terminal', line: `$ ${cmd}` });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ success: true }));
+      try {
+        const output = await this.executeTerminalCommand(cmd);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true, output }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
     }
 
-    // 11. Run Active File
+    // 16. Run Active File in Terminal
     if (pathname === '/api/terminal/run-file' && req.method === 'POST') {
       await this.runActiveFileInternal();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: true }));
     }
 
-    // 12. Remote Laptop System Control
+    // 17. Remote Laptop System Control
     if (pathname === '/api/system/control' && req.method === 'POST') {
       const action = body.action;
       try {
@@ -534,7 +836,7 @@ class LanServer {
       }
     }
 
-    // 13. System Stats (Laptop status for mobile dashboard)
+    // 18. System Stats (Laptop status for mobile dashboard)
     if (pathname === '/api/system/stats' && req.method === 'GET') {
       const freeMemMb = Math.round(os.freemem() / (1024 * 1024));
       const totalMemMb = Math.round(os.totalmem() / (1024 * 1024));
@@ -551,7 +853,7 @@ class LanServer {
       return res.end(JSON.stringify(data));
     }
 
-    // 14. AI Ask & Dual Sync (< 0.05s for commands, ~1.5s for deep questions)
+    // 19. AI Ask & Dual Sync (< 0.05s for commands, ~1.5s for deep questions)
     if (pathname === '/api/ai/ask' && req.method === 'POST') {
       const editor = vscode.window.activeTextEditor;
       const context = {
