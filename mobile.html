@@ -366,27 +366,6 @@
       border: none;
       cursor: pointer;
     }
-    /* Prompt Quick Chips */
-    .chips-row {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding: 6px 0;
-    }
-    .chip {
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      white-space: nowrap;
-      cursor: pointer;
-    }
-    .chip:active {
-      background: var(--primary);
-      color: #000;
-    }
     .chat-input-bar {
       display: flex;
       padding: 10px;
@@ -580,18 +559,6 @@
 
   <!-- Tab 1: AI Chat -->
   <div id="aiTab" class="view-content active">
-    <!-- Quick Action Chips -->
-    <div class="chips-row">
-      <div class="chip" style="border-color:#ef4444; color:#ef4444;" onclick="quickPrompt('اقفل اللابتوب')">🔒 اقفل اللابتوب</div>
-      <div class="chip" onclick="quickPrompt('علي الصوت')">🔊 علي الصوت</div>
-      <div class="chip" onclick="quickPrompt('وطي الصوت')">🔉 وطي الصوت</div>
-      <div class="chip" onclick="quickPrompt('احفظ الملف')">💾 احفظ الملف</div>
-      <div class="chip" onclick="quickPrompt('شغل الملف')">▶️ شغل الملف</div>
-      <div class="chip" onclick="quickPrompt('افتح التيرمينال')">⚡ التيرمينال</div>
-      <div class="chip" onclick="quickPrompt('اصلح الكود الحالي واشرح التعديلات')">🔧 اصلح الكود</div>
-      <div class="chip" onclick="quickPrompt('اشرح الكود الحالي خطوة بخطوة')">💡 اشرح الكود</div>
-    </div>
-
     <!-- Chat Box -->
     <div class="chat-container">
       <div class="chat-messages" id="chatMsgs">
@@ -812,7 +779,12 @@
       const statusEl = document.getElementById('authStatus');
       const btn = document.getElementById('connectBtn');
 
-      statusEl.innerHTML = '<div style="color:#38bdf8; font-weight:bold;">⏳ Request sent to laptop!<br><span style="font-size:12px; color:#94a3b8;">Please click "Accept (موافق)" on your VS Code screen.</span></div>';
+      if (!pin) {
+        statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">يرجى كتابة الكود المكون من 4 أرقام المعروض على اللابتوب</div>';
+        return;
+      }
+
+      statusEl.innerHTML = '<div style="color:#38bdf8; font-weight:bold;">⏳ تم إرسال طلب الاتصال إلى اللابتوب!<br><span style="font-size:12px; color:#94a3b8;">اضغط على "Accept (موافق)" على شاشة VS Code...</span></div>';
       btn.disabled = true;
 
       try {
@@ -826,18 +798,18 @@
           authToken = data.token;
           localStorage.setItem('da7e_token', authToken);
           document.getElementById('authOverlay').style.display = 'none';
-          showToast('🎉 Laptop Approved! Full Control Enabled.');
+          showToast('🎉 تم قبول الاتصال بنجاح!');
           refreshStatus();
           loadFiles();
         } else if (res.status === 403) {
-          statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ Connection rejected by laptop user.</div>';
+          statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ تم رفض الاتصال من شاشة اللابتوب.</div>';
           btn.disabled = false;
         } else {
-          statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ Invalid PIN. Check your laptop screen.</div>';
+          statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ كود خاطئ. تأكد من الرقم في VS Code.</div>';
           btn.disabled = false;
         }
       } catch (err) {
-        statusEl.innerHTML = '<div style="color:#ef4444;">Server error: ' + err.message + '</div>';
+        statusEl.innerHTML = '<div style="color:#ef4444;">خطأ في الاتصال: ' + err.message + '</div>';
         btn.disabled = false;
       }
     }

@@ -335,19 +335,31 @@ class LanServer {
       return res.end(getMobileHtml(this.localIp, this.port, this.pin));
     }
 
-    // 2. Authentication with PIN & Instant Secure Connection
+    // 2. Authentication with PIN & Permission Request on Laptop
     if (pathname === '/api/auth' && req.method === 'POST') {
       const body = await this.parseBody(req);
       if (body.pin && body.pin.toString() === this.pin.toString()) {
         const clientIp = (req.socket.remoteAddress || 'Mobile Phone').replace('::ffff:', '');
         
-        this.connectedPhonesCount++;
-        this.phoneConnected = true;
-        vscode.window.showInformationMessage(`🎉 Da7e AI: Phone [${clientIp}] connected! Live Chat & Remote Control active.`);
-        
-        if (this.onStatusChanged) this.onStatusChanged();
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ success: true, token: this.authToken }));
+        // Show permission request dialog on laptop with Accept/Reject
+        const choice = await vscode.window.showInformationMessage(
+          `📱 Da7e AI: Phone [${clientIp}] is requesting connection. Allow?`,
+          { modal: true },
+          'Accept (موافق)',
+          'Reject (رفض)'
+        );
+
+        if (choice === 'Accept (موافق)') {
+          this.connectedPhonesCount++;
+          this.phoneConnected = true;
+          vscode.window.showInformationMessage(`🎉 Da7e AI: Phone [${clientIp}] connected! Full Control Enabled.`);
+          if (this.onStatusChanged) this.onStatusChanged();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ success: true, token: this.authToken }));
+        } else {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ success: false, error: 'Connection rejected on laptop screen.' }));
+        }
       } else {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ success: false, error: 'Invalid PIN. Check your laptop screen.' }));
