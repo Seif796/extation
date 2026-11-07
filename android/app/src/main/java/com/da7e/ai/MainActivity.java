@@ -127,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
                 "function connectManual() {" +
                 "  let raw = document.getElementById('laptopIp').value.trim();" +
                 "  if (!raw) { alert('Please enter your laptop IP address shown in VS Code'); return; }" +
-                "  raw = raw.replace(/\/+$/, '');" +
+                "  while (raw.endsWith('/')) { raw = raw.slice(0, -1); }" +
                 "  if (!raw.startsWith('http://') && !raw.startsWith('https://')) raw = 'http://' + raw;" +
                 "  try {" +
                 "    let parsed = new URL(raw);" +
