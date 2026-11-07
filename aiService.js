@@ -1,5 +1,5 @@
-// Da7e AI Service (English AI Assistant)
-// Supports Gemini, Groq, OpenAI, Ollama, and built-in Smart Code Engine
+// Da7e AI Service
+// Supports Gemini, Groq, OpenAI, Ollama, and Free Cloud AI Engine
 
 class Da7eAiService {
   constructor(config = {}) {
@@ -17,7 +17,9 @@ class Da7eAiService {
   }
 
   async ask(prompt, context = {}) {
-    // 1. Try external AI API first
+    if (!prompt || !prompt.trim()) return 'Please enter a message or question.';
+
+    // 1. Try configured external AI API first if user provided an API key
     if (this.apiKey && this.apiKey.trim() !== '') {
       try {
         if (this.provider === 'gemini') {
@@ -30,13 +32,64 @@ class Da7eAiService {
           return await this.callOllama(prompt, context);
         }
       } catch (err) {
-        console.warn('[Da7e AI] External API error, falling back to built-in smart engine:', err.message);
-        return this.smartAssistant(prompt, context, err.message);
+        console.warn('[Da7e AI] Configured API error, falling back to free cloud AI:', err.message);
       }
     }
 
-    // 2. Built-in smart assistant fallback
-    return this.smartAssistant(prompt, context);
+    // 2. Free Cloud AI Engine (No API Key Required!)
+    try {
+      const cloudReply = await this.callFreeCloudAi(prompt, context);
+      if (cloudReply && cloudReply.trim().length > 0) {
+        return cloudReply.trim();
+      }
+    } catch (err) {
+      console.warn('[Da7e AI] Free Cloud AI error, using conversational engine:', err.message);
+    }
+
+    // 3. Resilient Built-in Conversational Assistant
+    return this.smartConversationalFallback(prompt, context);
+  }
+
+  async callFreeCloudAi(prompt, context) {
+    const isArabic = /[\u0600-\u06FF]/.test(prompt);
+    let systemInstruction = 'You are Da7e AI, an intelligent coding assistant and smart laptop remote controller. ' +
+      'Answer directly, concisely, and helpfully. If code is requested, provide complete and clean code inside markdown code blocks, followed by a brief explanation. ' +
+      (isArabic ? 'The user is speaking in Arabic; reply in fluent, natural Arabic.' : 'Reply in fluent, natural English.');
+
+    let fullPrompt = prompt;
+    if (context.activeFileName && (context.selectedCode || context.codeSnippet)) {
+      const codeSnippet = (context.selectedCode || context.codeSnippet || '').slice(0, 1500);
+      fullPrompt = `[Context File: ${context.activeFileName} (${context.language || ''})]\n` +
+                   `\`\`\`${context.language || ''}\n${codeSnippet}\n\`\`\`\n\n` +
+                   `User Request: ${prompt}`;
+    }
+
+    // Use GET with timeout controller for maximum speed and reliability
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+
+    try {
+      const encodedPrompt = encodeURIComponent(fullPrompt);
+      const encodedSystem = encodeURIComponent(systemInstruction);
+      const url = `https://text.pollinations.ai/${encodedPrompt}?system=${encodedSystem}&model=openai`;
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/plain, text/html'
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      return text;
+    } catch (e) {
+      clearTimeout(timeout);
+      throw e;
+    }
   }
 
   async callGemini(prompt, context) {
@@ -55,14 +108,16 @@ class Da7eAiService {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
 
-    const systemInstruction = 'You are Da7e AI, an expert software engineering assistant. Whenever the user requests any code modification, bug fix, or feature: first provide the complete, clean, production-ready code inside a markdown code block, and then provide a clear, step-by-step explanation breaking down every change so the developer thoroughly understands how the code works.';
+    const isArabic = /[\u0600-\u06FF]/.test(prompt);
+    const systemInstruction = 'You are Da7e AI, an expert software engineering assistant and laptop controller. Whenever code is requested, output clean code in markdown blocks, followed by clear explanations. ' +
+      (isArabic ? 'Answer in Arabic.' : 'Answer in English.');
 
     let fullPrompt = prompt;
     if (context.activeFileName) {
       fullPrompt = `[Active File: ${context.activeFileName} (${context.language || ''})]\n` +
                    (context.selectedCode ? `[Selected Code]:\n\`\`\`${context.language || ''}\n${context.selectedCode}\n\`\`\`\n\n` : '') +
-                   (context.codeSnippet && !context.selectedCode ? `[File Content]:\n\`\`\`${context.language || ''}\n${context.codeSnippet}\n\`\`\`\n\n` : '') +
-                   `User Request: ${prompt}\n\nPlease fix/write the code and explain everything clearly in English.`;
+                   (context.codeSnippet && !context.selectedCode ? `[File Content]:\n\`\`\`${context.language || ''}\n${context.codeSnippet.slice(0, 1500)}\n\`\`\`\n\n` : '') +
+                   `User Request: ${prompt}`;
     }
 
     const payload = {
@@ -90,6 +145,8 @@ class Da7eAiService {
 
   async callOpenAiCompatible(endpoint, prompt, context) {
     const modelName = this.provider === 'groq' ? (this.model || 'llama-3.3-70b-versatile') : (this.model || 'gpt-4o-mini');
+    const isArabic = /[\u0600-\u06FF]/.test(prompt);
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -99,7 +156,11 @@ class Da7eAiService {
       body: JSON.stringify({
         model: modelName,
         messages: [
-          { role: 'system', content: 'You are Da7e AI. Output the optimized code in markdown code blocks, then explain each change clearly.' },
+          {
+            role: 'system',
+            content: 'You are Da7e AI. Output optimized code in markdown code blocks, then explain each change clearly. ' +
+              (isArabic ? 'Answer in Arabic.' : 'Answer in English.')
+          },
           { role: 'user', content: prompt }
         ]
       })
@@ -125,73 +186,30 @@ class Da7eAiService {
     return data.response;
   }
 
-  // Built-in Smart Code Engine (English)
-  smartAssistant(prompt, context, originalError = '') {
-    const p = prompt.toLowerCase();
+  // Resilient natural conversational fallback (no boilerplate dummy templates!)
+  smartConversationalFallback(prompt, context) {
+    const p = prompt.trim();
+    const isArabic = /[\u0600-\u06FF]/.test(p);
     const code = context.selectedCode || context.codeSnippet || '';
     const lang = context.language || 'javascript';
-    const file = context.activeFileName || 'index.js';
+    const file = context.activeFileName || 'file';
 
-    let notice = '';
-    if (originalError && originalError.includes('401')) {
-      notice = `\n> 💡 **API Key Tip:** The current token is an internal session token. To use live Google cloud models directly, get a free key (starts with \`AIza...\`) from [Google AI Studio](https://aistudio.google.com/) and paste it in VS Code Settings.\n\n`;
+    if (isArabic) {
+      if (p.length <= 5 || p.includes('سلام') || p.includes('مرحبا') || p.includes('ازيك') || p.includes('اهلا') || p.includes('مين')) {
+        return `👋 أهلاً بك! أنا **Da7e AI**، مساعدك البرمجي وجهاز التحكم عن بُعد في اللابتوب.\n` +
+               `أنا متصل باللابتوب وجاهز لأي أمر! يمكنك كتابة أي كود تريده، أو طلب شرح أو إصلاح للأخطاء، أو التحكم في اللابتوب عبر الأزرار في الأسفل.`;
+      }
+      return `🤖 **تم استلام طلبك: "${p}"**\n\n` +
+             `أنا متصل بـ VS Code على اللابتوب. يمكنك تنفيذ الأوامر مباشرة، أو إرسال كود إلى المحرر، أو استخدام التيرمينال للتحكم الكامل.`;
     }
 
-    // Fix Bug / Refactor
-    if (p.includes('fix') || p.includes('bug') || p.includes('error') || p.includes('refactor') || p.includes('clean') || p.includes('optimize')) {
-      const fixedCode = this.generateRefactoredCode(code, lang);
-      return `🔧 **Da7e AI has analyzed, optimized, and fixed the code!**\n` +
-             notice +
-             `Here is the clean, production-ready code. Tap **⚡ Send to Laptop (VS Code)** to insert it directly into your active editor:\n\n` +
-             `\`\`\`${lang}\n${fixedCode}\n\`\`\`\n\n` +
-             `### 💡 Step-by-Step Explanation:\n` +
-             `1. **Robust Error Handling:** Added comprehensive \`try / catch\` exception handling to safeguard against unexpected runtime crashes.\n` +
-             `2. **Input Validation:** Verified variable states and guarded against \`null\` / \`undefined\` exceptions.\n` +
-             `3. **Clean Code Architecture:** Optimized execution flow, proper async/await handling, and clear variable naming according to best industry practices.`;
+    if (p.length <= 5 || p.toLowerCase().includes('hi') || p.toLowerCase().includes('hello') || p.toLowerCase().includes('hey')) {
+      return `👋 Hi there! I'm **Da7e AI**, your live coding assistant and laptop controller.\n` +
+             `I'm connected to your laptop. Ask me any programming questions, request code, or use the tabs to control your laptop remotely!`;
     }
 
-    // Explain Code
-    if (p.includes('explain') || p.includes('what') || p.includes('how') || p.includes('understand')) {
-      return `📖 **Da7e AI Code Breakdown for \`${file}\`:**\n` +
-             notice +
-             `\`\`\`${lang}\n${code ? code.slice(0, 400) : '// Current active code'}\n\`\`\`\n\n` +
-             `### 🧠 How this code works:\n` +
-             `1. **Initialization:** The script prepares initial state and required dependencies.\n` +
-             `2. **Core Logic Execution:** Processes incoming parameters through defined functions step by step.\n` +
-             `3. **Result Output:** Safely returns computed data or updates the user interface.\n\n` +
-             `💡 *Pro Tip:* You can request additions, Unit Tests, or optimizations directly from your phone!`;
-    }
-
-    // Generate New Feature
-    const generated = this.generateCustomSnippet(prompt, lang);
-    return `⚡ **Da7e AI generated the requested solution!**\n` +
-           notice +
-           `Ready to apply directly to your laptop editor:\n\n` +
-           `\`\`\`${lang}\n${generated}\n\`\`\`\n\n` +
-           `### 💡 How It Works:\n` +
-           `• Implemented tailored logic for: "${prompt}".\n` +
-           `• Uses modern asynchronous patterns for optimal performance and safety.\n` +
-           `• You can run and test this code immediately using the **Terminal** tab on your phone!`;
-  }
-
-  generateRefactoredCode(code, lang) {
-    if (!code || code.trim() === '') {
-      return `// Optimized Async Function by Da7e AI\nasync function handleTask(data) {\n  try {\n    if (!data) {\n      throw new Error("Invalid payload provided");\n    }\n    console.log("Processing task successfully:", data);\n    return { success: true, result: data };\n  } catch (error) {\n    console.error("Execution error:", error.message);\n    return { success: false, error: error.message };\n  }\n}`;
-    }
-
-    if (lang.includes('python') || lang.includes('py')) {
-      return `# Optimized and error-handled by Da7e AI\ntry:\n${code.split('\n').map(l => '    ' + l).join('\n')}\n    print("✅ Executed successfully with zero errors!")\nexcept Exception as error:\n    print(f"⚠️ Caught error: {error}")`;
-    }
-
-    return `// Optimized with error handling by Da7e AI\n(async () => {\n  try {\n${code.split('\n').map(l => '    ' + l).join('\n')}\n    console.log("✅ Code executed cleanly with zero errors!");\n  } catch (error) {\n    console.error("⚠️ Handled error:", error.message);\n  }\n})();`;
-  }
-
-  generateCustomSnippet(prompt, lang) {
-    if (lang.includes('python') || lang.includes('py')) {
-      return `def execute_feature():\n    """\n    Generated by Da7e AI for: ${prompt}\n    """\n    try:\n        print("🚀 Da7e AI executing feature...")\n        result = {"status": "success", "message": "Feature executed cleanly"}\n        return result\n    except Exception as error:\n        return {"status": "error", "message": str(error)}\n\nif __name__ == "__main__":\n    print(execute_feature())`;
-    }
-
-    return `/**\n * Generated by Da7e AI\n * Request: ${prompt}\n */\nasync function executeDa7eFeature() {\n  try {\n    console.log("🚀 Executing requested feature...");\n    const response = {\n      success: true,\n      timestamp: new Date().toISOString(),\n      message: "Operation completed according to best practices"\n    };\n    return response;\n  } catch (error) {\n    console.error("Feature execution error:", error);\n    throw error;\n  }\n}\n\n// Run feature\nexecuteDa7eFeature().then(console.log);`;
+    return `🤖 **Received your request:** "${p}"\n\n` +
+           `Ready to assist! You can send code directly to your laptop editor, run terminal commands, or control system media and files directly from your phone.`;
   }
 }
 

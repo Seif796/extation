@@ -585,6 +585,7 @@
   <!-- Tabs Nav -->
   <div class="tabs-nav">
     <button class="tab-btn active" onclick="switchTab('aiTab')">🤖 Da7e AI</button>
+    <button class="tab-btn" onclick="switchTab('remoteTab')">🎮 Remote</button>
     <button class="tab-btn" onclick="switchTab('editorTab')">📝 Editor</button>
     <button class="tab-btn" onclick="switchTab('terminalTab')">💻 Terminal</button>
     <button class="tab-btn" onclick="switchTab('filesTab')">📁 Files</button>
@@ -616,7 +617,72 @@
     </div>
   </div>
 
-  <!-- Tab 2: Editor Control -->
+  <!-- Tab 2: Laptop Remote Control -->
+  <div id="remoteTab" class="view-content">
+    <!-- Sound & Media Controls -->
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">🔊 Laptop Sound & Media:</div>
+      <div class="editor-btn-grid">
+        <button class="secondary-btn" onclick="systemControl('volume-up')">🔊 Vol +</button>
+        <button class="secondary-btn" onclick="systemControl('volume-down')">🔉 Vol -</button>
+        <button class="secondary-btn" onclick="systemControl('volume-mute')">🔇 Mute</button>
+        <button class="secondary-btn" onclick="systemControl('media-play-pause')">⏯️ Play / Pause</button>
+      </div>
+    </div>
+
+    <!-- System Actions -->
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--text); font-size:0.95rem;">💻 Laptop Controls:</div>
+      <div class="editor-btn-grid">
+        <button class="btn" style="background:linear-gradient(135deg, #ef4444, #b91c1c);" onclick="systemControl('lock-screen')">
+          🔒 Lock Laptop
+        </button>
+        <button class="secondary-btn" onclick="systemControl('save-all')">
+          💾 Save All
+        </button>
+        <button class="secondary-btn" onclick="systemControl('toggle-terminal')">
+          ⚡ Toggle Terminal
+        </button>
+        <button class="secondary-btn" onclick="systemControl('reload-window')">
+          🔄 Reload VS Code
+        </button>
+      </div>
+    </div>
+
+    <!-- Clipboard Sync -->
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">📋 Send to Laptop Clipboard:</div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="clipboardInput" class="chat-input" placeholder="Text to paste into laptop...">
+        <button class="btn" style="width:90px;" onclick="sendClipboardToLaptop()">Send</button>
+      </div>
+    </div>
+
+    <!-- Laptop Notification -->
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">🔔 Send Laptop Notification:</div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="notifyInput" class="chat-input" placeholder="Message for laptop screen...">
+        <button class="secondary-btn" style="width:90px;" onclick="sendNotificationToLaptop()">Notify</button>
+      </div>
+    </div>
+
+    <!-- Laptop Live Stats -->
+    <div class="editor-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; color:var(--text); font-size:0.95rem;">📊 Laptop Live Stats:</span>
+        <button class="secondary-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="loadSystemStats()">🔄 Refresh</button>
+      </div>
+      <div id="statsBox" style="font-size:0.85rem; color:var(--text-muted); display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+        <div>Device: <strong id="statHost" style="color:var(--text);">-</strong></div>
+        <div>RAM Usage: <strong id="statRam" style="color:#10b981;">-</strong></div>
+        <div>CPU Cores: <strong id="statCpu" style="color:var(--primary);">-</strong></div>
+        <div>Uptime: <strong id="statUptime" style="color:var(--text);">-</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Editor Control -->
   <div id="editorTab" class="view-content">
     <div class="editor-card">
       <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">Send Code to VS Code:</div>
@@ -855,8 +921,8 @@
             term.innerHTML += '<div>' + escapeHtml(data.line) + '</div>';
             term.scrollTop = term.scrollHeight;
           } else if (data.type === 'chatSync' && data.sender === 'laptop') {
-            appendMessage('💻 [From Laptop]: ' + data.prompt, 'user');
-            appendMessage(data.reply, 'ai');
+            appendMessage(data.prompt, 'user', '💻 From Laptop');
+            appendAiResponse(data.reply);
           }
         } catch (e) {}
       };
@@ -879,10 +945,10 @@
       const text = customText || input.value.trim();
       if (!text) return;
 
-      appendMessage(text, 'user');
+      appendMessage(text, 'user', '📱 From Phone');
       if (!customText) input.value = '';
 
-      const loadingId = appendMessage('⏳ Da7e AI is optimizing code and preparing explanation...', 'ai');
+      const loadingId = appendMessage('⏳ Da7e AI is processing your request...', 'ai');
 
       try {
         const res = await fetch('/api/ai/ask', {
@@ -904,15 +970,89 @@
       sendAiMessage(text);
     }
 
-    function appendMessage(text, sender) {
+    function appendMessage(text, sender, label) {
       const id = 'msg_' + Date.now();
       const div = document.createElement('div');
       div.id = id;
       div.className = 'msg ' + sender;
-      div.innerText = text;
+
+      let html = '';
+      if (label) {
+        const isPhone = label.includes('Phone');
+        const badgeColor = isPhone ? '#10b981' : '#38bdf8';
+        const badgeBg = isPhone ? 'rgba(16,185,129,0.2)' : 'rgba(56,189,248,0.2)';
+        html += '<div style="margin-bottom:6px;"><span style="background:' + badgeBg + '; color:' + badgeColor + '; border:1px solid ' + badgeColor + '; padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:700;">' + escapeHtml(label) + '</span></div>';
+      }
+      html += '<div>' + escapeHtml(text).replace(/\n/g, '<br>') + '</div>';
+      div.innerHTML = html;
+
       document.getElementById('chatMsgs').appendChild(div);
       div.scrollIntoView({ behavior: 'smooth' });
       return id;
+    }
+
+    async function systemControl(action) {
+      try {
+        const res = await fetch('/api/system/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('⚡ Laptop Action: ' + action);
+        } else {
+          showToast('⚠️ Action failed: ' + (data.error || ''));
+        }
+      } catch (e) {
+        showToast('⚠️ Error: ' + e.message);
+      }
+    }
+
+    async function sendClipboardToLaptop() {
+      const input = document.getElementById('clipboardInput');
+      const text = input.value.trim();
+      if (!text) return alert('Please enter text first');
+      try {
+        await fetch('/api/system/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'clipboard-copy', text, token: authToken })
+        });
+        showToast('📋 Copied to laptop clipboard!');
+        input.value = '';
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function sendNotificationToLaptop() {
+      const input = document.getElementById('notifyInput');
+      const message = input.value.trim();
+      if (!message) return alert('Please enter notification text');
+      try {
+        await fetch('/api/system/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'laptop-notify', message, token: authToken })
+        });
+        showToast('🔔 Notification popped on laptop!');
+        input.value = '';
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function loadSystemStats() {
+      try {
+        const res = await fetch('/api/system/stats?token=' + authToken);
+        const data = await res.json();
+        document.getElementById('statHost').innerText = data.hostname + ' (' + data.platform + ')';
+        document.getElementById('statRam').innerText = data.memoryUsed + ' MB / ' + data.memoryTotal + ' MB';
+        document.getElementById('statCpu').innerText = data.cpus + ' Cores';
+        document.getElementById('statUptime').innerText = data.uptime;
+        showToast('📊 Live laptop stats updated');
+      } catch (e) {}
     }
 
     function appendAiResponse(text) {

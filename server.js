@@ -4,6 +4,7 @@ const os = require('os');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const child_process = require('child_process');
 const vscode = require('vscode');
 const { getMobileHtml } = require('./mobileHtml');
 
@@ -17,6 +18,7 @@ class LanServer {
     this.localIp = this.getLocalIpAddress();
     this.sseClients = new Set();
     this.connectedPhonesCount = 0;
+    this.phoneConnected = false;
     this.onStatusChanged = null;
     this.onChatSync = null;
     this.terminal = null;
@@ -56,6 +58,10 @@ class LanServer {
 
   generatePin() {
     return Math.floor(1000 + Math.random() * 9000).toString();
+  }
+
+  isPhoneConnected() {
+    return this.phoneConnected || this.sseClients.size > 0 || this.connectedPhonesCount > 0;
   }
 
   start(customPort, customPin) {
@@ -102,6 +108,8 @@ class LanServer {
       this.server = null;
       this.isStarting = false;
       this.sseClients.clear();
+      this.phoneConnected = false;
+      this.connectedPhonesCount = 0;
       if (this.onStatusChanged) this.onStatusChanged();
     }
   }
@@ -149,7 +157,7 @@ class LanServer {
     const pathname = parsedUrl.pathname;
     const queryParams = Object.fromEntries(parsedUrl.searchParams.entries());
 
-    // 1. Mobile Web UI & Assets (Serve for any non-API path so IP is never "Not Found")
+    // 1. Mobile Web UI & Assets
     if (!pathname.startsWith('/api/')) {
       if (pathname === '/manifest.json') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -177,7 +185,8 @@ class LanServer {
         const clientIp = (req.socket.remoteAddress || 'Mobile Phone').replace('::ffff:', '');
         
         this.connectedPhonesCount++;
-        vscode.window.showInformationMessage(`🎉 Da7e AI: Phone [${clientIp}] connected! Dual-screen AI chat & remote control active.`);
+        this.phoneConnected = true;
+        vscode.window.showInformationMessage(`🎉 Da7e AI: Phone [${clientIp}] connected! Live Chat & Remote Control active.`);
         
         if (this.onStatusChanged) this.onStatusChanged();
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -197,7 +206,16 @@ class LanServer {
       });
       res.write('\n');
       this.sseClients.add(res);
-      req.on('close', () => this.sseClients.delete(res));
+      this.phoneConnected = true;
+      if (this.onStatusChanged) this.onStatusChanged();
+
+      req.on('close', () => {
+        this.sseClients.delete(res);
+        if (this.sseClients.size === 0) {
+          this.phoneConnected = false;
+        }
+        if (this.onStatusChanged) this.onStatusChanged();
+      });
       return;
     }
 
@@ -329,7 +347,59 @@ class LanServer {
       return res.end(JSON.stringify({ success: true }));
     }
 
-    // 12. AI Ask
+    // 12. Remote Laptop System Control
+    if (pathname === '/api/system/control' && req.method === 'POST') {
+      const action = body.action;
+      try {
+        if (action === 'volume-up') {
+          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]175)"');
+        } else if (action === 'volume-down') {
+          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]174)"');
+        } else if (action === 'volume-mute') {
+          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]173)"');
+        } else if (action === 'media-play-pause') {
+          child_process.exec('powershell -Command "(New-Object -ComObject WScript.Shell).SendKeys([char]179)"');
+        } else if (action === 'lock-screen') {
+          child_process.exec('rundll32.exe user32.dll,LockWorkStation');
+        } else if (action === 'toggle-terminal') {
+          vscode.commands.executeCommand('workbench.action.terminal.toggleTerminal');
+        } else if (action === 'save-all') {
+          vscode.commands.executeCommand('workbench.action.files.saveAll');
+        } else if (action === 'reload-window') {
+          vscode.commands.executeCommand('workbench.action.reloadWindow');
+        } else if (action === 'close-editor') {
+          vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        } else if (action === 'clipboard-copy') {
+          if (body.text) await vscode.env.clipboard.writeText(body.text);
+        } else if (action === 'laptop-notify') {
+          if (body.message) vscode.window.showInformationMessage(`📱 Phone says: ${body.message}`);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    // 13. System Stats (Laptop status for mobile dashboard)
+    if (pathname === '/api/system/stats' && req.method === 'GET') {
+      const freeMemMb = Math.round(os.freemem() / (1024 * 1024));
+      const totalMemMb = Math.round(os.totalmem() / (1024 * 1024));
+      const uptimeHours = (os.uptime() / 3600).toFixed(1);
+      const data = {
+        platform: os.platform(),
+        hostname: os.hostname(),
+        memoryUsed: totalMemMb - freeMemMb,
+        memoryTotal: totalMemMb,
+        uptime: `${uptimeHours} hrs`,
+        cpus: os.cpus().length
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(data));
+    }
+
+    // 14. AI Ask & Dual Sync
     if (pathname === '/api/ai/ask' && req.method === 'POST') {
       const editor = vscode.window.activeTextEditor;
       const context = {
@@ -341,15 +411,16 @@ class LanServer {
 
       const reply = await this.aiService.ask(body.prompt || '', context);
       
-      // Real-time synchronization to Laptop & Mobile
+      // Real-time synchronization to Laptop & Mobile (tagged from phone)
       this.broadcastSSE({
         type: 'chatSync',
         sender: 'mobile',
+        from: 'phone',
         prompt: body.prompt,
         reply
       });
       if (this.onChatSync) {
-        this.onChatSync({ sender: 'mobile', prompt: body.prompt, reply });
+        this.onChatSync({ sender: 'mobile', from: 'phone', prompt: body.prompt, reply });
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });

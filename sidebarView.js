@@ -1,4 +1,4 @@
-// Da7e AI Sidebar View Provider for VS Code (English UI)
+// Da7e AI Sidebar View Provider for VS Code
 const vscode = require('vscode');
 const { generateSvgQRCode } = require('./qrCode');
 
@@ -18,6 +18,7 @@ class Da7eSidebarProvider {
         this._view.webview.postMessage({
           type: 'chatSync',
           sender: chatData.sender,
+          from: chatData.from || chatData.sender,
           prompt: chatData.prompt,
           reply: chatData.reply
         });
@@ -74,11 +75,12 @@ class Da7eSidebarProvider {
             selectedCode: editor ? editor.document.getText(editor.selection) : ''
           };
           const reply = await this._aiService.ask(data.prompt, context);
-          this._view.webview.postMessage({ type: 'aiReply', reply });
+          this._view.webview.postMessage({ type: 'aiReply', reply, prompt: data.prompt });
           // Synchronize to mobile phone via SSE
           this._lanServer.broadcastSSE({
             type: 'chatSync',
             sender: 'laptop',
+            from: 'laptop',
             prompt: data.prompt,
             reply
           });
@@ -97,6 +99,7 @@ class Da7eSidebarProvider {
 
   _getHtmlForWebview() {
     const isRunning = this._lanServer.isRunning();
+    const isConnected = this._lanServer.isPhoneConnected();
     const url = this._lanServer.getConnectionUrl();
     const pin = this._lanServer.pin;
     const ip = this._lanServer.localIp;
@@ -146,6 +149,25 @@ class Da7eSidebarProvider {
       background: rgba(239, 68, 68, 0.2);
       color: #ef4444;
       border: 1px solid #ef4444;
+    }
+    .status-pill.connected {
+      background: rgba(16, 185, 129, 0.25);
+      color: #10b981;
+      border: 1px solid #10b981;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .connected-banner {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 10px 0;
+      text-align: center;
     }
     .qr-container {
       margin: 10px auto;
@@ -217,7 +239,7 @@ class Da7eSidebarProvider {
       padding: 12px;
     }
     .chat-box {
-      height: 130px;
+      height: 180px;
       overflow-y: auto;
       border: 1px solid var(--vscode-widget-border, #222);
       border-radius: 6px;
@@ -239,22 +261,59 @@ class Da7eSidebarProvider {
       outline: none;
       font-size: 11px;
     }
+    .badge-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+    .badge-phone {
+      background: rgba(16, 185, 129, 0.25);
+      color: #10b981;
+      border: 1px solid #10b981;
+    }
+    .badge-laptop {
+      background: rgba(56, 189, 248, 0.25);
+      color: #38bdf8;
+      border: 1px solid #38bdf8;
+    }
   </style>
 </head>
 <body>
   <div class="badge-card">
-    <div class="status-pill online">
-      <span>●</span>
-      <span>${isRunning ? 'Online - Scan with Phone' : 'Starting Server...'}</span>
-    </div>
-
-    <div style="font-size:11px; color:#94a3b8; margin-bottom:4px;">
-      📱 Scan with iPhone or Android Camera:
-    </div>
-
-    <div class="qr-container">
-      ${qrSvg}
-    </div>
+    ${isConnected ? `
+      <!-- Phone Connected State: QR is Hidden Automatically -->
+      <div class="status-pill connected">
+        <span>●</span>
+        <span>📱 Mobile Connected (Live)</span>
+      </div>
+      <div class="connected-banner">
+        <div style="font-size: 13px; font-weight: 800; color: #10b981;">🎉 Device Connected & Linked!</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Dual-screen AI chat & remote control active.</div>
+        <button class="btn secondary" style="margin-top: 8px; font-size: 10px; padding: 5px;" onclick="toggleQr()">
+          👁️ Toggle QR Code View
+        </button>
+      </div>
+      <div id="qrWrapper" style="display: none;">
+        <div class="qr-container">
+          ${qrSvg}
+        </div>
+      </div>
+    ` : `
+      <!-- Phone Not Connected: Show QR Code to Scan -->
+      <div class="status-pill online">
+        <span>●</span>
+        <span>${isRunning ? 'Online - Scan with Phone' : 'Starting Server...'}</span>
+      </div>
+      <div style="font-size:11px; color:#94a3b8; margin-bottom:4px;">
+        📱 Scan with Mobile Camera to Connect:
+      </div>
+      <div class="qr-container" id="qrContainer">
+        ${qrSvg}
+      </div>
+    `}
 
     <div class="info-box">
       <div class="info-row">
@@ -279,9 +338,12 @@ class Da7eSidebarProvider {
   </div>
 
   <div class="chat-section">
-    <div style="font-weight:700; margin-bottom:6px; color:#38bdf8;">🤖 Da7e AI Desktop Chat:</div>
+    <div style="font-weight:700; margin-bottom:6px; color:#38bdf8; display:flex; justify-content:space-between; align-items:center;">
+      <span>🤖 Da7e AI Live Chat:</span>
+      <span style="font-size:10px; color:#94a3b8;">${isConnected ? '🟢 Phone Synced' : '⚪ Waiting Phone'}</span>
+    </div>
     <div class="chat-box" id="sidebarChatBox">
-      <div>Ask Da7e AI anything about your code...</div>
+      <div style="color:#94a3b8;">Ask Da7e AI anything. Type here or from your phone...</div>
     </div>
     <div class="input-row">
       <input type="text" id="sidebarPrompt" placeholder="Ask Da7e AI..." onkeydown="if(event.key==='Enter') sendPrompt()">
@@ -292,28 +354,48 @@ class Da7eSidebarProvider {
   <script>
     const vscode = acquireVsCodeApi();
 
+    function toggleQr() {
+      const q = document.getElementById('qrWrapper');
+      if (q) {
+        q.style.display = (q.style.display === 'none' ? 'block' : 'none');
+      }
+    }
+
     function sendPrompt() {
       const input = document.getElementById('sidebarPrompt');
       const val = input.value.trim();
       if (!val) return;
       const box = document.getElementById('sidebarChatBox');
-      box.innerHTML += '<div style="color:#38bdf8; margin-top:4px;"><b>You:</b> ' + val + '</div>';
+      box.innerHTML += '<div style="margin-top:6px;"><span class="badge-tag badge-laptop">💻 From Laptop</span> <b>You:</b> ' + escapeHtml(val) + '</div>';
       input.value = '';
       box.scrollTop = box.scrollHeight;
 
       vscode.postMessage({ type: 'askAi', prompt: val });
     }
 
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatText(str) {
+      return escapeHtml(str).replace(/\\n/g, '<br>');
+    }
+
     window.addEventListener('message', event => {
       const msg = event.data;
+      const box = document.getElementById('sidebarChatBox');
+
       if (msg.type === 'aiReply') {
-        const box = document.getElementById('sidebarChatBox');
-        box.innerHTML += '<div style="margin-top:4px;"><b>🤖 Da7e AI:</b> ' + msg.reply.replace(/\\n/g, '<br>') + '</div>';
+        box.innerHTML += '<div style="margin-top:4px; padding-left:8px; border-left:2px solid #38bdf8;"><b>🤖 Da7e AI:</b> ' + formatText(msg.reply) + '</div>';
         box.scrollTop = box.scrollHeight;
-      } else if (msg.type === 'chatSync' && msg.sender === 'mobile') {
-        const box = document.getElementById('sidebarChatBox');
-        box.innerHTML += '<div style="color:#10b981; margin-top:6px;"><b>📱 Phone:</b> ' + msg.prompt + '</div>';
-        box.innerHTML += '<div style="margin-top:2px;"><b>🤖 Da7e AI:</b> ' + msg.reply.replace(/\\n/g, '<br>') + '</div>';
+      } else if (msg.type === 'chatSync') {
+        if (msg.sender === 'mobile' || msg.from === 'phone') {
+          box.innerHTML += '<div style="margin-top:6px;"><span class="badge-tag badge-phone">📱 From Phone</span> <b>Mobile User:</b> ' + escapeHtml(msg.prompt) + '</div>';
+          box.innerHTML += '<div style="margin-top:4px; padding-left:8px; border-left:2px solid #10b981;"><b>🤖 Da7e AI:</b> ' + formatText(msg.reply) + '</div>';
+        } else if (msg.sender === 'laptop') {
+          box.innerHTML += '<div style="margin-top:6px;"><span class="badge-tag badge-laptop">💻 From Laptop</span> <b>Laptop:</b> ' + escapeHtml(msg.prompt) + '</div>';
+          box.innerHTML += '<div style="margin-top:4px; padding-left:8px; border-left:2px solid #38bdf8;"><b>🤖 Da7e AI:</b> ' + formatText(msg.reply) + '</div>';
+        }
         box.scrollTop = box.scrollHeight;
       }
     });
