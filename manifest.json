@@ -1,0 +1,16 @@
+{
+  "name": "Da7e AI Controller",
+  "short_name": "Da7e AI",
+  "description": "Control VS Code and Da7e AI Assistant from your phone",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ]
+}

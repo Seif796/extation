@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0284c7">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="/icon.png">
+  <title>Da7e AI Controller</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(22, 30, 49, 0.88);
+      --card-border: rgba(56, 189, 248, 0.22);
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --accent: #818cf8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --code-bg: #030712;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      padding-bottom: 75px;
+    }
+    /* Auth Modal */
+    #authOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 15, 25, 0.96);
+      backdrop-filter: blur(14px);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .auth-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 26px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .auth-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .auth-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+    .pin-input {
+      width: 100%;
+      font-size: 1.8rem;
+      text-align: center;
+      letter-spacing: 8px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 2px solid var(--card-border);
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--primary);
+      outline: none;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
+    .pin-input:focus {
+      border-color: var(--primary);
+    }
+    .btn {
+      width: 100%;
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      color: #fff;
+      font-weight: 700;
+      padding: 14px;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.25);
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-secondary-action {
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: var(--primary);
+      margin-top: 10px;
+    }
+    /* QR Scanner Modal */
+    #scannerModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 10000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #scannerVideo {
+      width: 100%;
+      max-width: 480px;
+      height: 60vh;
+      object-fit: cover;
+      border-radius: 20px;
+    }
+    .scanner-box {
+      position: relative;
+      width: 250px;
+      height: 250px;
+      border: 3px solid #38bdf8;
+      border-radius: 20px;
+      margin: -200px auto 30px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+    }
+    .scanner-close {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    /* Install Banner */
+    #installBanner {
+      display: none;
+      background: linear-gradient(135deg, rgba(2,132,199,0.2), rgba(99,102,241,0.2));
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 10px 14px;
+      margin: 12px 16px 0;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-install {
+      background: var(--primary);
+      color: #000;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    /* Header */
+    header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 14px 18px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-logo h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .status-badge {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+    /* Active File Banner */
+    .active-file-bar {
+      background: rgba(30, 41, 59, 0.5);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding: 8px 16px;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+    }
+    .active-file-bar strong {
+      color: var(--text);
+    }
+    /* Tabs Navigation */
+    .tabs-nav {
+      display: flex;
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 1px solid var(--card-border);
+      padding: 6px 12px;
+      gap: 8px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border-radius: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    /* Content Views */
+    .view-content {
+      display: none;
+      padding: 16px;
+      flex: 1;
+    }
+    .view-content.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    /* AI Chat Tab */
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 280px);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      user-select: text;
+    }
+    .msg {
+      max-width: 90%;
+      padding: 14px 16px;
+      border-radius: 18px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.ai {
+      align-self: flex-start;
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-bottom-left-radius: 4px;
+      width: 95%;
+    }
+    .code-box {
+      background: var(--code-bg);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      color: #38bdf8;
+    }
+    .code-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .btn-apply-code {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(16,185,129,0.3);
+    }
+    .btn-apply-code:active {
+      transform: scale(0.96);
+    }
+    .btn-copy-code {
+      background: #334155;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    /* Prompt Quick Chips */
+    .chips-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 6px 0;
+    }
+    .chip {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .chip:active {
+      background: var(--primary);
+      color: #000;
+    }
+    .chat-input-bar {
+      display: flex;
+      padding: 10px;
+      background: #0f172a;
+      border-top: 1px solid var(--card-border);
+      gap: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+      user-select: text;
+    }
+    .chat-input:focus {
+      border-color: var(--primary);
+    }
+    .icon-btn {
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: var(--primary);
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+    .icon-btn.send {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+      border: none;
+    }
+    /* Editor Control Tab */
+    .editor-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .editor-textarea {
+      width: 100%;
+      height: 140px;
+      background: var(--code-bg);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 12px;
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 0.85rem;
+      outline: none;
+      user-select: text;
+    }
+    .editor-btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .secondary-btn {
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .secondary-btn:active {
+      background: rgba(56, 189, 248, 0.2);
+    }
+    /* Terminal Tab */
+    .term-box {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 14px;
+      height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #10b981;
+      user-select: text;
+    }
+    /* Files Tab */
+    .file-item {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .file-item:active {
+      border-color: var(--primary);
+    }
+    /* Toast */
+    #toast {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: #1e293b;
+      border: 1px solid var(--primary);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    }
+    #toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Auth Screen -->
+  <div id="authOverlay">
+    <div class="auth-card">
+      <div class="auth-title">Da7e AI Controller</div>
+      <p class="auth-desc">Connect to VS Code on your laptop (Same Wi-Fi)</p>
+      
+      <input type="password" id="pinInput" class="pin-input" placeholder="••••" maxlength="6" inputmode="numeric" value="{{DEFAULT_PIN}}">
+      
+      <button class="btn" id="connectBtn" onclick="authenticate()">
+        <span>🔐 Connect & Request Permission</span>
+      </button>
+
+      <button class="btn btn-secondary-action" onclick="openQrScanner()">
+        <span>📷 Scan Laptop QR Code</span>
+      </button>
+
+      <div id="authStatus" style="font-size:0.85rem; margin-top:14px; min-height:24px;"></div>
+    </div>
+  </div>
+
+  <!-- QR Scanner Camera Modal -->
+  <div id="scannerModal">
+    <button class="scanner-close" onclick="closeQrScanner()">✕ Close</button>
+    <video id="scannerVideo" playsinline></video>
+    <div class="scanner-box"></div>
+    <p style="color:#fff; font-size:14px; margin-top:16px;">Point camera at laptop screen QR code</p>
+  </div>
+
+  <!-- Install PWA Banner -->
+  <div id="installBanner">
+    <div style="font-size:0.85rem; color:#f8fafc;">📲 Install Da7e AI App on Phone</div>
+    <button class="btn-install" id="installBtn">Install App</button>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="header-logo">
+      <span>⚡</span>
+      <h1>Da7e AI</h1>
+    </div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="icon-btn" style="width:36px; height:36px; font-size:16px; border-radius:10px;" onclick="openQrScanner()" title="Scan Laptop QR Code anytime">📷</button>
+      <div class="status-badge" id="statusBadge">
+        <div class="status-dot"></div>
+        <span id="statusText">Connected to Laptop</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Active File Bar -->
+  <div class="active-file-bar">
+    <div>📄 File: <strong id="currentFile">Loading...</strong></div>
+    <div>Project: <strong id="currentProject">-</strong></div>
+  </div>
+
+  <!-- Tabs Nav -->
+  <div class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('aiTab')">🤖 Da7e AI</button>
+    <button class="tab-btn" onclick="switchTab('editorTab')">📝 Editor</button>
+    <button class="tab-btn" onclick="switchTab('terminalTab')">💻 Terminal</button>
+    <button class="tab-btn" onclick="switchTab('filesTab')">📁 Files</button>
+  </div>
+
+  <!-- Tab 1: AI Chat -->
+  <div id="aiTab" class="view-content active">
+    <!-- Quick Action Chips -->
+    <div class="chips-row">
+      <div class="chip" onclick="quickPrompt('Inspect the current code, fix any bugs, optimize it, and explain all changes at the end')">🔧 Fix & Optimize Code</div>
+      <div class="chip" onclick="quickPrompt('Explain this code step by step with clear explanations')">💡 Explain Code</div>
+      <div class="chip" onclick="quickPrompt('Improve performance and write unit tests for this code')">🚀 Performance Boost</div>
+      <div class="chip" onclick="quickPrompt('Add clear, professional documentation and comments to this code')">✍️ Add Comments</div>
+    </div>
+
+    <!-- Chat Box -->
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMsgs">
+        <div class="msg ai">
+          👋 Hello! I am <strong>Da7e AI</strong>.<br>
+          Connected live to VS Code on your laptop. Send any coding prompt, request bug fixes, or ask for features. I will format the code ready to insert into your laptop, and explain every step clearly! 🚀
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <button class="icon-btn" id="micBtn" onclick="toggleVoice()" title="Voice Input">🎙️</button>
+        <input type="text" id="aiInput" class="chat-input" placeholder="Ask Da7e AI to code, fix, or explain..." onkeydown="if(event.key==='Enter') sendAiMessage()">
+        <button class="icon-btn send" onclick="sendAiMessage()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: Editor Control -->
+  <div id="editorTab" class="view-content">
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">Send Code to VS Code:</div>
+      <textarea id="editorInput" class="editor-textarea" placeholder="// Type or paste code here to insert into your laptop..."></textarea>
+      
+      <div class="editor-btn-grid">
+        <button class="btn" onclick="insertCodeToVSCode()">
+          <span>📥 Insert in Laptop Editor</span>
+        </button>
+        <button class="secondary-btn" onclick="replaceSelectionInVSCode()">
+          <span>🔄 Replace Selection</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--text); font-size:0.95rem;">Remote Editor Controls:</div>
+      <div class="editor-btn-grid">
+        <button class="secondary-btn" onclick="editorAction('save')">💾 Save (Ctrl+S)</button>
+        <button class="secondary-btn" onclick="editorAction('format')">✨ Format Code</button>
+        <button class="secondary-btn" onclick="editorAction('undo')">↩️ Undo</button>
+        <button class="secondary-btn" onclick="editorAction('redo')">↪️ Redo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Terminal Control -->
+  <div id="terminalTab" class="view-content">
+    <div class="editor-card">
+      <div style="font-weight:700; color:var(--primary); font-size:0.95rem;">Terminal & Run Commands:</div>
+      <div class="editor-btn-grid">
+        <button class="btn" onclick="runActiveFile()">▶️ Run Active File</button>
+        <button class="secondary-btn" onclick="runTerminalCommand('npm start')">🚀 npm start</button>
+        <button class="secondary-btn" onclick="runTerminalCommand('git status')">🌿 git status</button>
+        <button class="secondary-btn" onclick="runTerminalCommand('clear')">🧹 Clear</button>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <input type="text" id="customCmdInput" class="chat-input" placeholder="Type terminal command here...">
+        <button class="btn" style="width:80px;" onclick="runCustomTerminal()">Run</button>
+      </div>
+    </div>
+
+    <div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">Live Terminal Stream:</div>
+    <div class="term-box" id="termOutput">
+      [Da7e AI Terminal Connected...]
+    </div>
+  </div>
+
+  <!-- Tab 4: Project Files -->
+  <div id="filesTab" class="view-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <span style="font-weight:700;">Workspace Files:</span>
+      <button class="secondary-btn" style="padding:6px 12px; font-size:0.75rem;" onclick="loadFiles()">🔄 Refresh</button>
+    </div>
+    <div id="filesList" style="display:flex; flex-direction:column; gap:8px;">
+      <div class="file-item">Tap refresh to load workspace files...</div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast">Success!</div>
+
+  <script>
+    let authToken = localStorage.getItem('da7e_token') || '';
+    let currentActiveCode = '';
+    let deferredPrompt = null;
+    let scannerStream = null;
+
+    // Handle PWA Installation
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const banner = document.getElementById('installBanner');
+      if (banner) banner.style.display = 'flex';
+    });
+
+    document.getElementById('installBtn')?.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          document.getElementById('installBanner').style.display = 'none';
+        }
+        deferredPrompt = null;
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryPin = urlParams.get('pin');
+      if (queryPin) {
+        document.getElementById('pinInput').value = queryPin;
+        authenticate();
+      } else if (authToken) {
+        verifyAuth();
+      }
+      initSSE();
+    });
+
+    function showToast(text) {
+      const toast = document.getElementById('toast');
+      toast.innerText = text;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    async function authenticate() {
+      const pin = document.getElementById('pinInput').value.trim();
+      const statusEl = document.getElementById('authStatus');
+      const btn = document.getElementById('connectBtn');
+
+      statusEl.innerHTML = '<div style="color:#38bdf8; font-weight:bold;">⏳ Request sent to laptop!<br><span style="font-size:12px; color:#94a3b8;">Please click "Accept (موافق)" on your VS Code screen.</span></div>';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin })
+        });
+        const data = await res.json();
+        if (data.success) {
+          authToken = data.token;
+          localStorage.setItem('da7e_token', authToken);
+          document.getElementById('authOverlay').style.display = 'none';
+          showToast('🎉 Laptop Approved! Full Control Enabled.');
+          refreshStatus();
+          loadFiles();
+        } else if (res.status === 403) {
+          statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ Connection rejected by laptop user.</div>';
+          btn.disabled = false;
+        } else {
+          statusEl.innerHTML = '<div style="color:#ef4444; font-weight:bold;">❌ Invalid PIN. Check your laptop screen.</div>';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        statusEl.innerHTML = '<div style="color:#ef4444;">Server error: ' + err.message + '</div>';
+        btn.disabled = false;
+      }
+    }
+
+    async function verifyAuth() {
+      try {
+        const res = await fetch('/api/state?token=' + authToken);
+        if (res.ok) {
+          document.getElementById('authOverlay').style.display = 'none';
+          refreshStatus();
+        } else {
+          document.getElementById('authOverlay').style.display = 'flex';
+        }
+      } catch (e) {
+        document.getElementById('authOverlay').style.display = 'flex';
+      }
+    }
+
+    // Camera QR Code Scanner
+    async function openQrScanner() {
+      const modal = document.getElementById('scannerModal');
+      const video = document.getElementById('scannerVideo');
+      modal.style.display = 'flex';
+
+      try {
+        scannerStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        video.srcObject = scannerStream;
+        await video.play();
+
+        // Native BarcodeDetector if available
+        if ('BarcodeDetector' in window) {
+          const detector = new BarcodeDetector({ formats: ['qr_code'] });
+          const scanInterval = setInterval(async () => {
+            if (!scannerStream) { clearInterval(scanInterval); return; }
+            try {
+              const barcodes = await detector.detect(video);
+              if (barcodes.length > 0) {
+                clearInterval(scanInterval);
+                const qrValue = barcodes[0].rawValue;
+                handleScannedQr(qrValue);
+              }
+            } catch (e) {}
+          }, 300);
+        }
+      } catch (err) {
+        alert('Could not access camera: ' + err.message);
+        closeQrScanner();
+      }
+    }
+
+    function handleScannedQr(value) {
+      closeQrScanner();
+      try {
+        const url = new URL(value);
+        const pin = url.searchParams.get('pin');
+        if (pin) {
+          document.getElementById('pinInput').value = pin;
+          authenticate();
+        } else {
+          window.location.href = value;
+        }
+      } catch (e) {
+        document.getElementById('pinInput').value = value;
+        authenticate();
+      }
+    }
+
+    function closeQrScanner() {
+      const modal = document.getElementById('scannerModal');
+      const video = document.getElementById('scannerVideo');
+      modal.style.display = 'none';
+      if (scannerStream) {
+        scannerStream.getTracks().forEach(track => track.stop());
+        scannerStream = null;
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    function initSSE() {
+      const evtSource = new EventSource('/api/events');
+      evtSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'fileChanged') {
+            document.getElementById('currentFile').innerText = data.fileName || 'No file open';
+            document.getElementById('currentProject').innerText = data.workspaceName || '-';
+            currentActiveCode = data.selectedCode || data.fileContent || '';
+          } else if (data.type === 'terminal') {
+            const term = document.getElementById('termOutput');
+            term.innerHTML += '<div>' + escapeHtml(data.line) + '</div>';
+            term.scrollTop = term.scrollHeight;
+          }
+        } catch (e) {}
+      };
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch('/api/state?token=' + authToken);
+        const data = await res.json();
+        if (data.fileName) {
+          document.getElementById('currentFile').innerText = data.fileName;
+          document.getElementById('currentProject').innerText = data.workspaceName || '-';
+          currentActiveCode = data.selectedCode || '';
+        }
+      } catch (e) {}
+    }
+
+    async function sendAiMessage(customText) {
+      const input = document.getElementById('aiInput');
+      const text = customText || input.value.trim();
+      if (!text) return;
+
+      appendMessage(text, 'user');
+      if (!customText) input.value = '';
+
+      const loadingId = appendMessage('⏳ Da7e AI is optimizing code and preparing explanation...', 'ai');
+
+      try {
+        const res = await fetch('/api/ai/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: text, token: authToken })
+        });
+        const data = await res.json();
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        appendAiResponse(data.reply);
+      } catch (err) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.innerHTML = '⚠️ Connection error: ' + err.message;
+      }
+    }
+
+    function quickPrompt(text) {
+      sendAiMessage(text);
+    }
+
+    function appendMessage(text, sender) {
+      const id = 'msg_' + Date.now();
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = 'msg ' + sender;
+      div.innerText = text;
+      document.getElementById('chatMsgs').appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+      return id;
+    }
+
+    function appendAiResponse(text) {
+      const div = document.createElement('div');
+      div.className = 'msg ai';
+      
+      const codeBlockRegex = /```([\s\S]*?)```/g;
+      let lastIndex = 0;
+      let match;
+      let html = '';
+
+      while ((match = codeBlockRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          html += '<div>' + escapeHtml(text.substring(lastIndex, match.index)).replace(/\n/g, '<br>') + '</div>';
+        }
+        const blockContent = match[1].trim();
+        const lines = blockContent.split('\n');
+        const lang = lines[0].trim();
+        const code = (lang && !lang.includes(' ') && lines.length > 1) ? lines.slice(1).join('\n') : blockContent;
+        const encodedCode = encodeURIComponent(code);
+
+        html += '<div class="code-box"><code>' + escapeHtml(code) + '</code></div>';
+        html += '<div class="code-actions">' +
+                '<button class="btn-apply-code" onclick="sendExtractedCode(\'' + encodedCode + '\')">⚡ Send to Laptop (VS Code)</button>' +
+                '<button class="btn-copy-code" onclick="copyCode(\'' + encodedCode + '\')">📋 Copy</button>' +
+                '</div>';
+        lastIndex = codeBlockRegex.lastIndex;
+      }
+
+      if (lastIndex < text.length) {
+        html += '<div>' + escapeHtml(text.substring(lastIndex)).replace(/\n/g, '<br>') + '</div>';
+      }
+
+      div.innerHTML = html;
+      document.getElementById('chatMsgs').appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function copyCode(encodedCode) {
+      const code = decodeURIComponent(encodedCode);
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('📋 Code copied to clipboard');
+      });
+    }
+
+    function sendExtractedCode(encodedCode) {
+      const code = decodeURIComponent(encodedCode);
+      insertCodeDirect(code);
+    }
+
+    let recognition = null;
+    function toggleVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Speech recognition is not supported in this browser. Please type your message.');
+        return;
+      }
+      if (!recognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.onstart = () => {
+          document.getElementById('micBtn').style.background = '#ef4444';
+          showToast('🎙️ Listening... Speak now');
+        };
+        recognition.onresult = (e) => {
+          const text = e.results[0][0].transcript;
+          document.getElementById('aiInput').value = text;
+          sendAiMessage(text);
+        };
+        recognition.onend = () => {
+          document.getElementById('micBtn').style.background = '#1e293b';
+          recognition = null;
+        };
+        recognition.start();
+      } else {
+        recognition.stop();
+      }
+    }
+
+    async function insertCodeToVSCode() {
+      const text = document.getElementById('editorInput').value;
+      if (!text) return alert('Please enter code first');
+      await insertCodeDirect(text);
+    }
+
+    async function insertCodeDirect(text) {
+      try {
+        const res = await fetch('/api/editor/insert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: text, token: authToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('⚡ Code inserted into laptop successfully!');
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (e) {
+        alert('Insert failed: ' + e.message);
+      }
+    }
+
+    async function replaceSelectionInVSCode() {
+      const text = document.getElementById('editorInput').value;
+      try {
+        const res = await fetch('/api/editor/replace', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: text, token: authToken })
+        });
+        showToast('🔄 Replaced selection in laptop');
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function editorAction(action) {
+      try {
+        await fetch('/api/editor/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, token: authToken })
+        });
+        showToast('Executed: ' + action);
+      } catch (e) {}
+    }
+
+    async function runActiveFile() {
+      try {
+        await fetch('/api/terminal/run-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: authToken })
+        });
+        showToast('▶️ Running file in laptop terminal...');
+      } catch (e) {}
+    }
+
+    async function runTerminalCommand(cmd) {
+      try {
+        await fetch('/api/terminal/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd, token: authToken })
+        });
+        showToast('Sent command: ' + cmd);
+      } catch (e) {}
+    }
+
+    function runCustomTerminal() {
+      const cmd = document.getElementById('customCmdInput').value.trim();
+      if (!cmd) return;
+      runTerminalCommand(cmd);
+      document.getElementById('customCmdInput').value = '';
+    }
+
+    async function loadFiles() {
+      try {
+        const res = await fetch('/api/files?token=' + authToken);
+        const data = await res.json();
+        const list = document.getElementById('filesList');
+        list.innerHTML = '';
+        if (!data.files || data.files.length === 0) {
+          list.innerHTML = '<div class="file-item">No files found in workspace</div>';
+          return;
+        }
+        data.files.forEach(f => {
+          const item = document.createElement('div');
+          item.className = 'file-item';
+          item.innerHTML = '<span>📄 ' + escapeHtml(f) + '</span><span style="color:var(--primary); font-size:0.75rem;">Open in Laptop ↗</span>';
+          item.onclick = () => openFile(f);
+          list.appendChild(item);
+        });
+      } catch (e) {}
+    }
+
+    async function openFile(filename) {
+      try {
+        await fetch('/api/editor/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: filename, token: authToken })
+        });
+        showToast('📂 Opened ' + filename + ' in VS Code');
+      } catch (e) {}
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

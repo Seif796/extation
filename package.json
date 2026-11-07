@@ -1,0 +1,145 @@
+{
+  "name": "da7e-bot",
+  "displayName": "Da7eBot AI - Code Assistant & Remote Controller",
+  "description": "AI Coding Assistant and Mobile LAN Remote Controller for VS Code (iPhone & Android)",
+  "version": "1.0.1",
+  "publisher": "Da7e",
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Seif796/extation"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "da7e",
+    "ai",
+    "remote control",
+    "mobile control",
+    "lan",
+    "wifi",
+    "assistant",
+    "code helper"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "da7e-container",
+          "title": "Da7e AI",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "da7e-container": [
+        {
+          "type": "webview",
+          "id": "da7e.sidebarView",
+          "name": "Da7e AI Remote & Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "da7e.startServer",
+        "title": "Da7e AI: Start LAN Server",
+        "icon": "$(play)"
+      },
+      {
+        "command": "da7e.stopServer",
+        "title": "Da7e AI: Stop Server",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "da7e.showQrCode",
+        "title": "Da7e AI: Show QR Code & Connection Info",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "da7e.openInBrowser",
+        "title": "Da7e AI: Open Mobile Controller in Browser",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "da7e.askAi",
+        "title": "Da7e AI: Ask AI Assistant",
+        "icon": "$(hubot)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "da7e.showQrCode",
+          "when": "view == da7e.sidebarView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "da7e.startServer",
+          "when": "view == da7e.sidebarView",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "da7e.askAi",
+          "group": "da7e@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Da7e AI Settings",
+      "properties": {
+        "da7e.serverPort": {
+          "type": "number",
+          "default": 38888,
+          "description": "Port for the LAN mobile controller server"
+        },
+        "da7e.securityPin": {
+          "type": "string",
+          "default": "",
+          "description": "Custom PIN for mobile connection (leave empty for auto 4-digit PIN)"
+        },
+        "da7e.aiProvider": {
+          "type": "string",
+          "enum": [
+            "gemini",
+            "groq",
+            "openai",
+            "ollama",
+            "free-offline"
+          ],
+          "default": "gemini",
+          "description": "AI Provider (Gemini, Groq, OpenAI, Ollama, or built-in offline engine)"
+        },
+        "da7e.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API Key for AI Provider"
+        },
+        "da7e.aiModel": {
+          "type": "string",
+          "default": "gemini-1.5-flash",
+          "description": "Preferred AI model name (e.g. gemini-1.5-flash, llama-3.3-70b-versatile, gpt-4o-mini)"
+        },
+        "da7e.ollamaUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "Ollama server URL for local offline AI"
+        }
+      }
+    }
+  }
+}

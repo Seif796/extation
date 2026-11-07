@@ -1,0 +1,7 @@
+.gradle/
+android/.gradle/
+android/app/build/
+*.log
+out.txt
+err.txt
+node_modules/
