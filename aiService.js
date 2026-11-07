@@ -1,17 +1,17 @@
 // Da7e AI Service
-// Supports Gemini, Groq, OpenAI, Ollama, and Free Cloud AI Engine
+// Supports Gemini (gemini-3.5-flash-lite, gemini-3.5-flash, gemini-3.6-flash), Groq, OpenAI, Ollama, and Free Cloud AI
 
 class Da7eAiService {
   constructor(config = {}) {
     this.provider = config.aiProvider || 'gemini';
     this.apiKey = config.apiKey || '';
-    this.model = config.aiModel || 'gemini-1.5-flash';
+    this.model = config.aiModel || 'gemini-3.5-flash-lite';
     this.ollamaUrl = config.ollamaUrl || 'http://127.0.0.1:11434';
   }
 
   updateConfig(config) {
     if (config.aiProvider) this.provider = config.aiProvider;
-    if (config.apiKey !== undefined && config.apiKey !== '') this.apiKey = config.apiKey;
+    if (config.apiKey !== undefined && config.apiKey !== '') this.apiKey = config.apiKey.trim();
     if (config.aiModel) this.model = config.aiModel;
     if (config.ollamaUrl) this.ollamaUrl = config.ollamaUrl;
   }
@@ -32,7 +32,7 @@ class Da7eAiService {
           return await this.callOllama(prompt, context);
         }
       } catch (err) {
-        console.warn('[Da7e AI] Configured API error, falling back to free cloud AI:', err.message);
+        console.warn('[Da7e AI] Primary API failed:', err.message, '- trying fallback cloud engine...');
       }
     }
 
@@ -50,73 +50,24 @@ class Da7eAiService {
     return this.smartConversationalFallback(prompt, context);
   }
 
-  async callFreeCloudAi(prompt, context) {
+  async callGemini(prompt, context) {
+    // Modern Google Gemini models (Gemini 1.5/2.5 are retired for new keys)
+    let candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+    if (this.model && !this.model.includes('1.5') && !this.model.includes('2.5')) {
+      candidateModels = [this.model, ...candidateModels];
+    }
+    const uniqueModels = [...new Set(candidateModels)];
+
     const isArabic = /[\u0600-\u06FF]/.test(prompt);
-    let systemInstruction = 'You are Da7e AI, an intelligent coding assistant and smart laptop remote controller. ' +
-      'Answer directly, concisely, and helpfully. If code is requested, provide complete and clean code inside markdown code blocks, followed by a brief explanation. ' +
+    const systemInstruction = 'You are Da7e AI, an expert programming assistant and laptop remote controller. ' +
+      'Answer directly, smartly, and helpfully. If code is requested, provide complete and clean code inside markdown code blocks, followed by a clear explanation. ' +
       (isArabic ? 'The user is speaking in Arabic; reply in fluent, natural Arabic.' : 'Reply in fluent, natural English.');
 
     let fullPrompt = prompt;
     if (context.activeFileName && (context.selectedCode || context.codeSnippet)) {
-      const codeSnippet = (context.selectedCode || context.codeSnippet || '').slice(0, 1500);
-      fullPrompt = `[Context File: ${context.activeFileName} (${context.language || ''})]\n` +
-                   `\`\`\`${context.language || ''}\n${codeSnippet}\n\`\`\`\n\n` +
-                   `User Request: ${prompt}`;
-    }
-
-    // Use GET with timeout controller for maximum speed and reliability
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9000);
-
-    try {
-      const encodedPrompt = encodeURIComponent(fullPrompt);
-      const encodedSystem = encodeURIComponent(systemInstruction);
-      const url = `https://text.pollinations.ai/${encodedPrompt}?system=${encodedSystem}&model=openai`;
-
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'text/plain, text/html'
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeout);
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      return text;
-    } catch (e) {
-      clearTimeout(timeout);
-      throw e;
-    }
-  }
-
-  async callGemini(prompt, context) {
-    let modelName = this.model || 'gemini-1.5-flash';
-    if (modelName.includes('3.5') || modelName === 'gemini_flash3.5') {
-      modelName = 'gemini-1.5-flash';
-    }
-
-    const headers = { 'Content-Type': 'application/json' };
-    let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-
-    if (this.apiKey.startsWith('AIza')) {
-      url += `?key=${this.apiKey}`;
-      headers['x-goog-api-key'] = this.apiKey;
-    } else {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
-    }
-
-    const isArabic = /[\u0600-\u06FF]/.test(prompt);
-    const systemInstruction = 'You are Da7e AI, an expert software engineering assistant and laptop controller. Whenever code is requested, output clean code in markdown blocks, followed by clear explanations. ' +
-      (isArabic ? 'Answer in Arabic.' : 'Answer in English.');
-
-    let fullPrompt = prompt;
-    if (context.activeFileName) {
+      const snippet = (context.selectedCode || context.codeSnippet || '').slice(0, 3000);
       fullPrompt = `[Active File: ${context.activeFileName} (${context.language || ''})]\n` +
-                   (context.selectedCode ? `[Selected Code]:\n\`\`\`${context.language || ''}\n${context.selectedCode}\n\`\`\`\n\n` : '') +
-                   (context.codeSnippet && !context.selectedCode ? `[File Content]:\n\`\`\`${context.language || ''}\n${context.codeSnippet.slice(0, 1500)}\n\`\`\`\n\n` : '') +
+                   `\`\`\`${context.language || ''}\n${snippet}\n\`\`\`\n\n` +
                    `User Request: ${prompt}`;
     }
 
@@ -125,22 +76,47 @@ class Da7eAiService {
       systemInstruction: { parts: [{ text: systemInstruction }] }
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload)
-    });
+    let lastError = null;
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Gemini ${res.status}: ${errText}`);
+    // Try each valid model until one succeeds
+    for (const modelName of uniqueModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+        const headers = {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey
+        };
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
+        }
+
+        const data = await res.json();
+        const candidate = data.candidates?.[0];
+        const text = candidate?.content?.parts?.[0]?.text;
+        if (text && text.trim().length > 0) {
+          return text.trim();
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`[Da7e AI] Gemini model ${modelName} error:`, err.message);
+      }
     }
 
-    const data = await res.json();
-    const candidate = data.candidates?.[0];
-    const text = candidate?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('Empty response from Gemini');
-    return text;
+    throw lastError || new Error('All Gemini models failed');
   }
 
   async callOpenAiCompatible(endpoint, prompt, context) {
@@ -158,7 +134,7 @@ class Da7eAiService {
         messages: [
           {
             role: 'system',
-            content: 'You are Da7e AI. Output optimized code in markdown code blocks, then explain each change clearly. ' +
+            content: 'You are Da7e AI, an expert programming assistant and laptop controller. ' +
               (isArabic ? 'Answer in Arabic.' : 'Answer in English.')
           },
           { role: 'user', content: prompt }
@@ -186,30 +162,53 @@ class Da7eAiService {
     return data.response;
   }
 
-  // Resilient natural conversational fallback (no boilerplate dummy templates!)
+  async callFreeCloudAi(prompt, context) {
+    const isArabic = /[\u0600-\u06FF]/.test(prompt);
+    const systemInstruction = 'You are Da7e AI, an intelligent coding assistant and smart laptop remote controller. ' +
+      (isArabic ? 'Answer in fluent Arabic.' : 'Answer in English.');
+
+    // Limit prompt length so it stays within URL constraints
+    const cleanPrompt = prompt.slice(0, 500);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const encodedPrompt = encodeURIComponent(cleanPrompt);
+      const encodedSystem = encodeURIComponent(systemInstruction);
+      const url = `https://text.pollinations.ai/${encodedPrompt}?system=${encodedSystem}&model=openai`;
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'text/plain, text/html' },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.text();
+    } catch (e) {
+      clearTimeout(timeout);
+      throw e;
+    }
+  }
+
   smartConversationalFallback(prompt, context) {
     const p = prompt.trim();
     const isArabic = /[\u0600-\u06FF]/.test(p);
-    const code = context.selectedCode || context.codeSnippet || '';
-    const lang = context.language || 'javascript';
-    const file = context.activeFileName || 'file';
 
     if (isArabic) {
       if (p.length <= 5 || p.includes('سلام') || p.includes('مرحبا') || p.includes('ازيك') || p.includes('اهلا') || p.includes('مين')) {
         return `👋 أهلاً بك! أنا **Da7e AI**، مساعدك البرمجي وجهاز التحكم عن بُعد في اللابتوب.\n` +
-               `أنا متصل باللابتوب وجاهز لأي أمر! يمكنك كتابة أي كود تريده، أو طلب شرح أو إصلاح للأخطاء، أو التحكم في اللابتوب عبر الأزرار في الأسفل.`;
+               `أنا متصل باللابتوب وجاهز لمساعدتك في أي سؤال أو كتابة كود أو التحكم في اللابتوب!`;
       }
-      return `🤖 **تم استلام طلبك: "${p}"**\n\n` +
-             `أنا متصل بـ VS Code على اللابتوب. يمكنك تنفيذ الأوامر مباشرة، أو إرسال كود إلى المحرر، أو استخدام التيرمينال للتحكم الكامل.`;
+      return `🤖 **تم استلام رسالتك بنجاح!**\n\n` +
+             `الطلب: "${p}"\n` +
+             `أنا متصل بـ VS Code على اللابتوب. يمكنك إرسال الأكواد مباشرة للمحرر أو تشغيل التيرمينال من التبويبات بالأسفل.`;
     }
 
-    if (p.length <= 5 || p.toLowerCase().includes('hi') || p.toLowerCase().includes('hello') || p.toLowerCase().includes('hey')) {
-      return `👋 Hi there! I'm **Da7e AI**, your live coding assistant and laptop controller.\n` +
-             `I'm connected to your laptop. Ask me any programming questions, request code, or use the tabs to control your laptop remotely!`;
-    }
-
-    return `🤖 **Received your request:** "${p}"\n\n` +
-           `Ready to assist! You can send code directly to your laptop editor, run terminal commands, or control system media and files directly from your phone.`;
+    return `🤖 **Da7e AI Connected & Ready!**\n\n` +
+           `Received: "${p}"\n` +
+           `You can control your laptop, run terminal commands, and insert code directly into VS Code from your phone!`;
   }
 }
 

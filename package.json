@@ -2,7 +2,7 @@
   "name": "da7e-bot",
   "displayName": "Da7eBot AI - Code Assistant & Remote Controller",
   "description": "AI Coding Assistant and Mobile LAN Remote Controller for VS Code (iPhone & Android)",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "Da7e",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -131,8 +131,8 @@
         },
         "da7e.aiModel": {
           "type": "string",
-          "default": "gemini-1.5-flash",
-          "description": "Preferred AI model name (e.g. gemini-1.5-flash, llama-3.3-70b-versatile, gpt-4o-mini)"
+          "default": "gemini-3.5-flash-lite",
+          "description": "Preferred AI model name (e.g. gemini-3.5-flash-lite, gemini-3.5-flash, llama-3.3-70b-versatile, gpt-4o-mini)"
         },
         "da7e.ollamaUrl": {
           "type": "string",

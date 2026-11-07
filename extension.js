@@ -17,9 +17,24 @@ async function activate(context) {
   aiService = new Da7eAiService({
     aiProvider: config.get('aiProvider') || 'gemini',
     apiKey: config.get('apiKey') || '',
-    aiModel: config.get('aiModel') || 'gemini-1.5-flash',
+    aiModel: config.get('aiModel') || 'gemini-3.5-flash-lite',
     ollamaUrl: config.get('ollamaUrl')
   });
+
+  // Listen for configuration updates
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('da7e')) {
+        const cfg = vscode.workspace.getConfiguration('da7e');
+        aiService.updateConfig({
+          aiProvider: cfg.get('aiProvider') || 'gemini',
+          apiKey: cfg.get('apiKey') || '',
+          aiModel: cfg.get('aiModel') || 'gemini-3.5-flash-lite',
+          ollamaUrl: cfg.get('ollamaUrl')
+        });
+      }
+    })
+  );
 
   // 2. Initialize Server
   lanServer = new LanServer(aiService);
