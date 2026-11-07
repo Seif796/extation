@@ -2,7 +2,7 @@
   "name": "da7e-bot",
   "displayName": "Da7eBot AI - Code Assistant & Remote Controller",
   "description": "AI Coding Assistant and Mobile LAN Remote Controller for VS Code (iPhone & Android)",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "publisher": "Da7e",
   "icon": "media/icon.png",
   "license": "MIT",

@@ -531,28 +531,16 @@
     <div class="auth-card">
       <img src="/icon.png" style="width:72px; height:72px; border-radius:20px; margin-bottom:12px; box-shadow:0 8px 24px rgba(56,189,248,0.35); border:1px solid rgba(56,189,248,0.4);" alt="Da7eBot">
       <div class="auth-title">Da7eBot AI Remote</div>
-      <p class="auth-desc">Connect to VS Code on your laptop (Same Wi-Fi)</p>
+      <p class="auth-desc">Enter the 4-digit code shown on your laptop screen</p>
       
       <input type="password" id="pinInput" class="pin-input" placeholder="••••" maxlength="6" inputmode="numeric" value="{{DEFAULT_PIN}}">
       
       <button class="btn" id="connectBtn" onclick="authenticate()">
-        <span>🔐 Connect & Request Permission</span>
-      </button>
-
-      <button class="btn btn-secondary-action" onclick="openQrScanner()">
-        <span>📷 Scan Laptop QR Code</span>
+        <span>⚡ Connect to Laptop</span>
       </button>
 
       <div id="authStatus" style="font-size:0.85rem; margin-top:14px; min-height:24px;"></div>
     </div>
-  </div>
-
-  <!-- QR Scanner Camera Modal -->
-  <div id="scannerModal">
-    <button class="scanner-close" onclick="closeQrScanner()">✕ Close</button>
-    <video id="scannerVideo" playsinline></video>
-    <div class="scanner-box"></div>
-    <p style="color:#fff; font-size:14px; margin-top:16px;">Point camera at laptop screen QR code</p>
   </div>
 
   <!-- Install PWA Banner -->
@@ -568,7 +556,6 @@
       <h1>Da7eBot AI</h1>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
-      <button class="icon-btn" style="width:36px; height:36px; font-size:16px; border-radius:10px;" onclick="openQrScanner()" title="Scan Laptop QR Code anytime">📷</button>
       <div class="status-badge" id="statusBadge">
         <div class="status-dot"></div>
         <span id="statusText">Connected to Laptop</span>
@@ -776,6 +763,7 @@
     });
 
     window.addEventListener('DOMContentLoaded', () => {
+      loadSavedChatHistory();
       const urlParams = new URLSearchParams(window.location.search);
       const queryPin = urlParams.get('pin');
       if (queryPin) {
@@ -786,6 +774,31 @@
       }
       initSSE();
     });
+
+    function loadSavedChatHistory() {
+      try {
+        const saved = localStorage.getItem('da7e_chat_history');
+        if (saved) {
+          const items = JSON.parse(saved);
+          items.forEach(it => {
+            if (it.isAi) {
+              appendAiResponse(it.text, false);
+            } else {
+              appendMessage(it.text, it.sender || 'user', it.label, false);
+            }
+          });
+        }
+      } catch(e) {}
+    }
+
+    function saveChatItem(item) {
+      try {
+        let history = JSON.parse(localStorage.getItem('da7e_chat_history') || '[]');
+        history.push(item);
+        if (history.length > 50) history = history.slice(-50);
+        localStorage.setItem('da7e_chat_history', JSON.stringify(history));
+      } catch(e) {}
+    }
 
     function showToast(text) {
       const toast = document.getElementById('toast');
@@ -840,67 +853,6 @@
         }
       } catch (e) {
         document.getElementById('authOverlay').style.display = 'flex';
-      }
-    }
-
-    // Camera QR Code Scanner
-    async function openQrScanner() {
-      const modal = document.getElementById('scannerModal');
-      const video = document.getElementById('scannerVideo');
-      modal.style.display = 'flex';
-
-      try {
-        scannerStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        });
-        video.srcObject = scannerStream;
-        await video.play();
-
-        // Native BarcodeDetector if available
-        if ('BarcodeDetector' in window) {
-          const detector = new BarcodeDetector({ formats: ['qr_code'] });
-          const scanInterval = setInterval(async () => {
-            if (!scannerStream) { clearInterval(scanInterval); return; }
-            try {
-              const barcodes = await detector.detect(video);
-              if (barcodes.length > 0) {
-                clearInterval(scanInterval);
-                const qrValue = barcodes[0].rawValue;
-                handleScannedQr(qrValue);
-              }
-            } catch (e) {}
-          }, 300);
-        }
-      } catch (err) {
-        alert('Could not access camera: ' + err.message);
-        closeQrScanner();
-      }
-    }
-
-    function handleScannedQr(value) {
-      closeQrScanner();
-      try {
-        const url = new URL(value);
-        const pin = url.searchParams.get('pin');
-        if (pin) {
-          document.getElementById('pinInput').value = pin;
-          authenticate();
-        } else {
-          window.location.href = value;
-        }
-      } catch (e) {
-        document.getElementById('pinInput').value = value;
-        authenticate();
-      }
-    }
-
-    function closeQrScanner() {
-      const modal = document.getElementById('scannerModal');
-      const video = document.getElementById('scannerVideo');
-      modal.style.display = 'none';
-      if (scannerStream) {
-        scannerStream.getTracks().forEach(track => track.stop());
-        scannerStream = null;
       }
     }
 
@@ -974,7 +926,10 @@
       sendAiMessage(text);
     }
 
-    function appendMessage(text, sender, label) {
+    function appendMessage(text, sender, label, shouldSave) {
+      if (shouldSave !== false) {
+        saveChatItem({ isAi: false, text, sender, label });
+      }
       const id = 'msg_' + Date.now();
       const div = document.createElement('div');
       div.id = id;
@@ -1059,7 +1014,10 @@
       } catch (e) {}
     }
 
-    function appendAiResponse(text) {
+    function appendAiResponse(text, shouldSave) {
+      if (shouldSave !== false) {
+        saveChatItem({ isAi: true, text });
+      }
       const div = document.createElement('div');
       div.className = 'msg ai';
       
