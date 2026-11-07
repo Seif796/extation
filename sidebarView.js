@@ -12,6 +12,17 @@ class Da7eSidebarProvider {
     this._lanServer.onStatusChanged = () => {
       this.updateView();
     };
+
+    this._lanServer.onChatSync = (chatData) => {
+      if (this._view) {
+        this._view.webview.postMessage({
+          type: 'chatSync',
+          sender: chatData.sender,
+          prompt: chatData.prompt,
+          reply: chatData.reply
+        });
+      }
+    };
   }
 
   resolveWebviewView(webviewView) {
@@ -64,6 +75,13 @@ class Da7eSidebarProvider {
           };
           const reply = await this._aiService.ask(data.prompt, context);
           this._view.webview.postMessage({ type: 'aiReply', reply });
+          // Synchronize to mobile phone via SSE
+          this._lanServer.broadcastSSE({
+            type: 'chatSync',
+            sender: 'laptop',
+            prompt: data.prompt,
+            reply
+          });
           break;
       }
     });
@@ -291,6 +309,11 @@ class Da7eSidebarProvider {
       if (msg.type === 'aiReply') {
         const box = document.getElementById('sidebarChatBox');
         box.innerHTML += '<div style="margin-top:4px;"><b>🤖 Da7e AI:</b> ' + msg.reply.replace(/\\n/g, '<br>') + '</div>';
+        box.scrollTop = box.scrollHeight;
+      } else if (msg.type === 'chatSync' && msg.sender === 'mobile') {
+        const box = document.getElementById('sidebarChatBox');
+        box.innerHTML += '<div style="color:#10b981; margin-top:6px;"><b>📱 Phone:</b> ' + msg.prompt + '</div>';
+        box.innerHTML += '<div style="margin-top:2px;"><b>🤖 Da7e AI:</b> ' + msg.reply.replace(/\\n/g, '<br>') + '</div>';
         box.scrollTop = box.scrollHeight;
       }
     });

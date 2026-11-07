@@ -18,6 +18,7 @@ class LanServer {
     this.sseClients = new Set();
     this.connectedPhonesCount = 0;
     this.onStatusChanged = null;
+    this.onChatSync = null;
     this.terminal = null;
     this.isStarting = false;
   }
@@ -148,24 +149,25 @@ class LanServer {
     const pathname = parsedUrl.pathname;
     const queryParams = Object.fromEntries(parsedUrl.searchParams.entries());
 
-    // 1. Mobile Web UI & Assets
-    if (pathname === '/' || pathname === '/index.html') {
+    // 1. Mobile Web UI & Assets (Serve for any non-API path so IP is never "Not Found")
+    if (!pathname.startsWith('/api/')) {
+      if (pathname === '/manifest.json') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        const manifestPath = path.join(__dirname, 'manifest.json');
+        return res.end(fs.readFileSync(manifestPath, 'utf8'));
+      }
+
+      if (pathname === '/icon.png' || pathname === '/app_icon.png') {
+        const iconPath = path.join(__dirname, 'media', 'icon.png');
+        if (fs.existsSync(iconPath)) {
+          res.writeHead(200, { 'Content-Type': 'image/png' });
+          return res.end(fs.readFileSync(iconPath));
+        }
+      }
+
+      // Default: Always serve mobile.html for any frontend path
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(getMobileHtml(this.localIp, this.port, this.pin));
-    }
-
-    if (pathname === '/manifest.json') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      const manifestPath = path.join(__dirname, 'manifest.json');
-      return res.end(fs.readFileSync(manifestPath, 'utf8'));
-    }
-
-    if (pathname === '/icon.png') {
-      const iconPath = path.join(__dirname, 'media', 'icon.png');
-      if (fs.existsSync(iconPath)) {
-        res.writeHead(200, { 'Content-Type': 'image/png' });
-        return res.end(fs.readFileSync(iconPath));
-      }
     }
 
     // 2. Authentication with PIN & Laptop Approval
@@ -364,6 +366,18 @@ class LanServer {
       };
 
       const reply = await this.aiService.ask(body.prompt || '', context);
+      
+      // Real-time synchronization to Laptop & Mobile
+      this.broadcastSSE({
+        type: 'chatSync',
+        sender: 'mobile',
+        prompt: body.prompt,
+        reply
+      });
+      if (this.onChatSync) {
+        this.onChatSync({ sender: 'mobile', prompt: body.prompt, reply });
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ reply }));
     }

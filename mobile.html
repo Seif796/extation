@@ -529,7 +529,8 @@
   <!-- Auth Screen -->
   <div id="authOverlay">
     <div class="auth-card">
-      <div class="auth-title">Da7e AI Controller</div>
+      <img src="/icon.png" style="width:72px; height:72px; border-radius:20px; margin-bottom:12px; box-shadow:0 8px 24px rgba(56,189,248,0.35); border:1px solid rgba(56,189,248,0.4);" alt="Da7eBot">
+      <div class="auth-title">Da7eBot AI Remote</div>
       <p class="auth-desc">Connect to VS Code on your laptop (Same Wi-Fi)</p>
       
       <input type="password" id="pinInput" class="pin-input" placeholder="••••" maxlength="6" inputmode="numeric" value="{{DEFAULT_PIN}}">
@@ -563,8 +564,8 @@
   <!-- Header -->
   <header>
     <div class="header-logo">
-      <span>⚡</span>
-      <h1>Da7e AI</h1>
+      <img src="/icon.png" style="width:30px; height:30px; border-radius:8px; border:1px solid rgba(56,189,248,0.5); object-fit:cover;" alt="Da7e">
+      <h1>Da7eBot AI</h1>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
       <button class="icon-btn" style="width:36px; height:36px; font-size:16px; border-radius:10px;" onclick="openQrScanner()" title="Scan Laptop QR Code anytime">📷</button>
@@ -853,6 +854,9 @@
             const term = document.getElementById('termOutput');
             term.innerHTML += '<div>' + escapeHtml(data.line) + '</div>';
             term.scrollTop = term.scrollHeight;
+          } else if (data.type === 'chatSync' && data.sender === 'laptop') {
+            appendMessage('💻 [From Laptop]: ' + data.prompt, 'user');
+            appendMessage(data.reply, 'ai');
           }
         } catch (e) {}
       };

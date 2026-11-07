@@ -1,6 +1,14 @@
 .vscode/**
 .github/**
 android/**
+.git/**
 *.vsix
+*.apk
 *.zip
 *.log
+*.bat
+*.ps1
+auto_setup.ps1
+github_setup_complete.json
+err.txt
+out.txt
